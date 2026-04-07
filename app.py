@@ -7,10 +7,12 @@ import time
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from supabase import create_client, Client
+import eventlet
+eventlet.monkey_patch()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'mathpong-secret-2024')
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # ── SUPABASE ──────────────────────────────────────────────────────────────────
 SUPABASE_URL = os.environ.get('SUPABASE_URL', '')
@@ -193,7 +195,6 @@ class GameRoom:
             return
         self.math_active = True
         self.math_player = player_idx
-        # Gera uma conta diferente para cada jogador
         q0 = self._gen_question()
         q1 = self._gen_question()
         self.math_questions = [q0, q1]
@@ -203,13 +204,12 @@ class GameRoom:
         for i, sid in enumerate(self.sids):
             q = self.math_questions[i]
             socketio.emit('math_question', {
-                'player_idx': player_idx,  # quem causou o desafio (para exibição)
-                'for_me':     True,        # ambos respondem
+                'player_idx': player_idx,
+                'for_me':     True,
                 'question':   q['text'],
                 'choices':    q['choices'],
             }, to=sid)
 
-        # auto-timeout after 8s
         def timeout():
             time.sleep(8)
             for i in range(2):
@@ -239,7 +239,6 @@ class GameRoom:
             return
         time.sleep(1.3)
         self.math_active = False
-        # Aplica efeito baseado nos resultados de cada um
         r = self.math_results
         if r[0] is True and r[1] is True:
             self.speed_mult = max(0.7, self.speed_mult * 0.92)
@@ -249,7 +248,6 @@ class GameRoom:
             self.speed_mult = max(0.7, self.speed_mult * 0.85)
         elif r[1] is True and r[0] is not True:
             self.speed_mult = min(1.8, self.speed_mult * 1.2)
-        # Reapply speed
         b = self.ball
         spd = math.sqrt(b['vx']**2 + b['vy']**2)
         new_spd = BALL_SPEED * self.speed_mult
@@ -340,7 +338,6 @@ def on_join_queue(data):
 
     with waiting_lock:
         if waiting and waiting['sid'] != sid:
-            # Match found!
             w = waiting
             waiting = None
             room_id = str(uuid.uuid4())[:8]
@@ -354,7 +351,6 @@ def on_join_queue(data):
             )
             rooms[room_id] = room
 
-            # Tell each player their index
             socketio.emit('match_found', {
                 'room_id':    room_id,
                 'player_idx': 0,
