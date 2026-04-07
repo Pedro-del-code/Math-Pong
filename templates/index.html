@@ -360,23 +360,6 @@ function resize() {
 resize();
 window.addEventListener('resize', resize);
 
-// ══ 3D PERSPECTIVE ════════════════════════════════════════════════════════════
-const CAM  = { x:0, y:-1.4, z:-2.2 };
-const FOV  = 420;
-const TILT = 0.22;
-
-function project(x3, y3, z3) {
-  const rx = x3 - CAM.x;
-  const ry = y3 - CAM.y;
-  const rz = z3 - CAM.z;
-  const sc = FOV / (FOV + rz * 180);
-  return {
-    x: cx + rx * sc * W * 0.38,
-    y: cy + (ry + rz * TILT) * sc * H * 0.38,
-    s: sc
-  };
-}
-
 // ══ GAME STATE ════════════════════════════════════════════════════════════════
 const PADDLE_H = 0.22;
 const PADDLE_W = 0.04;
@@ -391,211 +374,73 @@ let ballState  = { x:0, y:0, vx:0, vy:0 };
 let scores     = [0, 0];
 let particles  = [];
 let animFrame  = null;
+let armSwing   = 0;
 
-// ══ FIRST PERSON ARM ═════════════════════════════════════════════════════════
-// armY: 0 = center, -1 = top, 1 = bottom
-let armY        = 0;
-let armTargetY  = 0;
-let prevArmY    = 0;
-let armSwing    = 0; // for hit animation
-
-function drawArm(paddleY) {
-  // Smooth follow
-  armTargetY = paddleY;
-  armY += (armTargetY - armY) * 0.18;
-  const swing = armSwing;
-  armSwing *= 0.85;
-
-  const side   = myIdx === 0 ? 1 : -1; // 0=left, 1=right
-  const baseX  = myIdx === 0 ? W * 0.12 : W * 0.88;
-  const baseY  = H * 0.78 + armY * H * 0.28;
-  const swingX = swing * 30 * (myIdx === 0 ? 1 : -1);
-
-  ctx.save();
-
-  // ── Arm (forearm) ──
-  const elbowX = baseX + swingX;
-  const elbowY = baseY;
-  const handX  = baseX + (myIdx === 0 ? 60 : -60) + swingX;
-  const handY  = baseY - 40;
-
-  // Sleeve
-  ctx.beginPath();
-  ctx.moveTo(baseX - 22 * side, baseY + 20);
-  ctx.lineTo(baseX + 22 * side, baseY + 20);
-  ctx.lineTo(handX + 16 * side, handY + 8);
-  ctx.lineTo(handX - 16 * side, handY + 8);
-  ctx.closePath();
-  const sleeveColor = myIdx === 0
-    ? ctx.createLinearGradient(baseX, baseY, handX, handY)
-    : ctx.createLinearGradient(baseX, baseY, handX, handY);
-  sleeveColor.addColorStop(0, myIdx === 0 ? '#003050' : '#300010');
-  sleeveColor.addColorStop(1, myIdx === 0 ? '#005080' : '#500020');
-  ctx.fillStyle = sleeveColor;
-  ctx.fill();
-
-  // Skin (hand)
-  ctx.beginPath();
-  ctx.ellipse(handX, handY, 18, 13, Math.atan2(handY - baseY, handX - baseX), 0, Math.PI*2);
-  ctx.fillStyle = '#c8956c';
-  ctx.fill();
-
-  // ── Racket handle ──
-  const racketX = handX + (myIdx === 0 ? 38 : -38) + swingX * 0.4;
-  const racketY = handY - 18;
-
-  ctx.beginPath();
-  ctx.moveTo(handX + (myIdx===0?10:-10), handY - 6);
-  ctx.lineTo(racketX - (myIdx===0?20:-20), racketY + 30);
-  ctx.lineWidth = 9;
-  ctx.strokeStyle = '#8B5E3C';
-  ctx.lineCap = 'round';
-  ctx.stroke();
-
-  // ── Racket head ──
-  const rx = racketX;
-  const ry = racketY - 10;
-  const rw = 22; const rh = 30;
-
-  // Shadow/glow
-  ctx.save();
-  ctx.shadowColor = myIdx === 0 ? '#00eeff' : '#ff4466';
-  ctx.shadowBlur  = 18;
-  ctx.beginPath();
-  ctx.ellipse(rx, ry, rw, rh, 0.2, 0, Math.PI*2);
-  ctx.strokeStyle = myIdx === 0 ? '#00eeff' : '#ff4466';
-  ctx.lineWidth = 3;
-  ctx.stroke();
-  ctx.restore();
-
-  // Strings horizontal
-  for (let i = -3; i <= 3; i++) {
-    const sy = ry + i * (rh/3.5);
-    const hw = Math.sqrt(Math.max(0, 1 - (i/(3.5))**2)) * rw;
-    ctx.beginPath();
-    ctx.moveTo(rx - hw, sy);
-    ctx.lineTo(rx + hw, sy);
-    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-    ctx.lineWidth = 0.8;
-    ctx.stroke();
-  }
-  // Strings vertical
-  for (let i = -2; i <= 2; i++) {
-    const sx = rx + i * (rw/2.2);
-    const vh = Math.sqrt(Math.max(0, 1 - (i/2.2)**2)) * rh;
-    ctx.beginPath();
-    ctx.moveTo(sx, ry - vh);
-    ctx.lineTo(sx, ry + vh);
-    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-    ctx.lineWidth = 0.8;
-    ctx.stroke();
-  }
-
-  ctx.restore();
-}
-
-// ══ DRAW SCENE ════════════════════════════════════════════════════════════════
+// ══ DRAW SCENE (CLASSIC PONG 2D) ══════════════════════════════════════════════
 function drawBackground() {
-  ctx.fillStyle = '#000408';
+  ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, W, H);
-  ctx.save();
-  ctx.fillStyle = 'rgba(255,255,255,0.35)';
-  for (let i = 0; i < 90; i++) {
-    ctx.fillRect((i*137.5)%W, (i*73.1)%(H*0.55), 1, 1);
-  }
-  ctx.restore();
-  const g = ctx.createLinearGradient(0, H*0.5, 0, H);
-  g.addColorStop(0, 'rgba(0,80,120,0.06)');
-  g.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = g; ctx.fillRect(0, H*0.5, W, H*0.5);
 }
 
-function drawTable() {
-  const corners = [[-1,0,-1],[1,0,-1],[1,0,1],[-1,0,1]].map(([x,y,z])=>project(x,y,z));
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(corners[0].x, corners[0].y);
-  corners.slice(1).forEach(p=>ctx.lineTo(p.x,p.y));
-  ctx.closePath();
-  const gr = ctx.createLinearGradient(corners[0].x,corners[0].y,corners[2].x,corners[2].y);
-  gr.addColorStop(0,'rgba(0,30,60,0.85)');
-  gr.addColorStop(.5,'rgba(0,60,80,0.75)');
-  gr.addColorStop(1,'rgba(0,30,60,0.85)');
-  ctx.fillStyle=gr; ctx.fill();
-  ctx.strokeStyle='rgba(0,220,255,0.12)'; ctx.lineWidth=1;
-  for(let i=-4;i<=4;i++){
-    const t=i/4;
-    const a=project(t,0,-1),b=project(t,0,1);
-    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
-    const c=project(-1,0,t),d=project(1,0,t);
-    ctx.beginPath();ctx.moveTo(c.x,c.y);ctx.lineTo(d.x,d.y);ctx.stroke();
+function drawCenterLine() {
+  const dashH = H * 0.045;
+  const gap   = H * 0.025;
+  const x     = cx;
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  for (let y = 0; y < H; y += dashH + gap) {
+    ctx.fillRect(x - 2, y, 4, dashH);
   }
-  ctx.strokeStyle='rgba(255,255,255,0.22)'; ctx.lineWidth=2; ctx.setLineDash([8,10]);
-  const ml=project(0,0,-1),mr=project(0,0,1);
-  ctx.beginPath();ctx.moveTo(ml.x,ml.y);ctx.lineTo(mr.x,mr.y);ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.strokeStyle='rgba(0,220,255,0.45)'; ctx.lineWidth=2;
-  ctx.beginPath();ctx.moveTo(corners[0].x,corners[0].y);
-  corners.slice(1).forEach(p=>ctx.lineTo(p.x,p.y));ctx.closePath();ctx.stroke();
+}
+
+// Convert game coords (-1..1) to screen pixels
+function gx(v) { return cx + v * cx * 0.88; }
+function gy(v) { return cy + v * cy * 0.88; }
+function gs(v) { return v * Math.min(W, H) * 0.88 * 0.5; }
+
+function drawPaddleRect(px, py, isP1) {
+  const color = isP1 ? '#00eeff' : '#ff4466';
+  const sw = gs(PADDLE_W * 2);
+  const sh = gs(PADDLE_H * 2);
+  const sx = gx(px) - sw / 2;
+  const sy = gy(py) - sh / 2;
+
+  ctx.save();
+  ctx.shadowColor = color;
+  ctx.shadowBlur  = 18;
+  ctx.fillStyle   = color;
+  ctx.fillRect(sx, sy, sw, sh);
   ctx.restore();
 }
 
-function drawPaddle(px, py, isP1) {
-  const color  = isP1 ? '#00eeff' : '#ff4466';
-  const gcolor = isP1 ? 'rgba(0,238,255,' : 'rgba(255,68,102,';
-  const hw=PADDLE_W, hh=PADDLE_H;
-  const pts3=[
-    [px-hw,-(py-hh)*0.8,px>0?0.95:-0.95],
-    [px+hw,-(py-hh)*0.8,px>0?0.95:-0.95],
-    [px+hw,-(py+hh)*0.8,px>0?0.95:-0.95],
-    [px-hw,-(py+hh)*0.8,px>0?0.95:-0.95],
-  ];
-  const pts=pts3.map(([a,b,c])=>project(a,b,c));
+function drawBallRect(bx, by) {
+  const r  = gs(BALL_R * 2);
+  const sx = gx(bx) - r / 2;
+  const sy = gy(by) - r / 2;
   ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(pts[0].x,pts[0].y);
-  pts.slice(1).forEach(p=>ctx.lineTo(p.x,p.y));
-  ctx.closePath();
-  const g=ctx.createLinearGradient(pts[0].x,pts[0].y,pts[2].x,pts[2].y);
-  g.addColorStop(0,gcolor+'0.25)');g.addColorStop(.5,gcolor+'0.55)');g.addColorStop(1,gcolor+'0.25)');
-  ctx.fillStyle=g; ctx.fill();
-  ctx.strokeStyle=color; ctx.lineWidth=2;
-  ctx.shadowColor=color; ctx.shadowBlur=16;
-  ctx.stroke(); ctx.restore();
-}
-
-function drawBall(bx,by) {
-  const p=project(bx,-by*0.05,by*0.9);
-  const r=p.s*W*0.016;
-  ctx.save();
-  ctx.shadowColor='#fff'; ctx.shadowBlur=22;
-  const g=ctx.createRadialGradient(p.x-r*.3,p.y-r*.3,0,p.x,p.y,r);
-  g.addColorStop(0,'#fff');g.addColorStop(.5,'#aaffff');g.addColorStop(1,'rgba(0,200,255,0.5)');
-  ctx.fillStyle=g;
-  ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);ctx.fill();
-  const sh=project(bx,0,by*0.9);
-  ctx.globalAlpha=.25;ctx.shadowBlur=0;
-  ctx.fillStyle='#003344';
-  ctx.beginPath();ctx.ellipse(sh.x,sh.y,r*1.2,r*.4,0,0,Math.PI*2);ctx.fill();
+  ctx.shadowColor = '#fff';
+  ctx.shadowBlur  = 24;
+  ctx.fillStyle   = '#fff';
+  ctx.fillRect(sx, sy, r, r);
   ctx.restore();
 }
 
 function updateParticles() {
-  particles=particles.filter(p=>p.life>0);
-  particles.forEach(p=>{
-    p.x+=p.vx;p.y+=p.vy;p.vy+=.12;p.life-=.04;p.vx*=.95;
-    ctx.save();ctx.globalAlpha=p.life*.8;
-    ctx.shadowColor=p.color;ctx.shadowBlur=6;ctx.fillStyle=p.color;
-    ctx.beginPath();ctx.arc(p.x,p.y,p.r*p.life,0,Math.PI*2);ctx.fill();
+  particles = particles.filter(p => p.life > 0);
+  particles.forEach(p => {
+    p.x += p.vx; p.y += p.vy; p.vy += 0.12; p.life -= 0.04; p.vx *= 0.95;
+    ctx.save();
+    ctx.globalAlpha = p.life * 0.8;
+    ctx.shadowColor = p.color; ctx.shadowBlur = 6; ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI*2); ctx.fill();
     ctx.restore();
   });
 }
 
-function spawnParticles(bx,by,color) {
-  const p=project(bx,-by*.05,by*.9);
-  for(let i=0;i<10;i++){
-    const a=Math.random()*Math.PI*2,s=1.5+Math.random()*3;
-    particles.push({x:p.x,y:p.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,color,r:2+Math.random()*3});
+function spawnParticles(bx, by, color) {
+  const sx = gx(bx); const sy = gy(by);
+  for (let i = 0; i < 10; i++) {
+    const a = Math.random() * Math.PI * 2, s = 1.5 + Math.random() * 3;
+    particles.push({ x: sx, y: sy, vx: Math.cos(a)*s, vy: Math.sin(a)*s, life: 1, color, r: 2+Math.random()*3 });
   }
 }
 
@@ -603,19 +448,15 @@ function spawnParticles(bx,by,color) {
 function renderLoop() {
   animFrame = requestAnimationFrame(renderLoop);
   drawBackground();
-  drawTable();
+  drawCenterLine();
 
-  // Draw opponent paddle (far side), my paddle (near side)
   const p0y = myIdx===0 ? myPaddleY  : oppPaddleY;
   const p1y = myIdx===0 ? oppPaddleY : myPaddleY;
-  drawPaddle(-0.9, p0y, true);
-  drawPaddle( 0.9, p1y, false);
+  drawPaddleRect(-0.9, p0y, true);
+  drawPaddleRect( 0.9, p1y, false);
 
-  drawBall(ballState.x, ballState.y);
+  drawBallRect(ballState.x, ballState.y);
   updateParticles();
-
-  // First-person arm (my side)
-  drawArm(myPaddleY);
 }
 
 // ══ INPUT ═════════════════════════════════════════════════════════════════════
@@ -737,10 +578,9 @@ let mathTimerSec      = 8;
 let myTurnToAnswer    = false;
 
 function showMath(data) {
-  myTurnToAnswer = (data.player_idx === myIdx);
-  const colors   = ['#00eeff','#ff4466'];
+  myTurnToAnswer = true; // agora TODOS respondem sempre
   document.getElementById('math-who').innerHTML =
-    `<span style="color:${colors[data.player_idx]}">${data.player_idx===myIdx?'VOCÊ':'OPONENTE'}</span> — RESPONDE!`;
+    `<span style="color:var(--gold)">⚡ SUA CONTA — RESPONDE!</span>`;
   document.getElementById('math-q').textContent = data.question;
   document.getElementById('math-fb').textContent = '';
 
@@ -750,8 +590,7 @@ function showMath(data) {
     const btn = document.createElement('button');
     btn.className = 'math-btn';
     btn.textContent = c;
-    if(myTurnToAnswer) btn.onclick = ()=>answerMath(i);
-    else btn.style.opacity = '0.5';
+    btn.onclick = ()=>answerMath(i);
     btnsDiv.appendChild(btn);
   });
 
