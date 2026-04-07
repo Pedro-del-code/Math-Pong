@@ -193,36 +193,62 @@ class GameRoom:
             return
         self.math_active = True
         self.math_player = player_idx
-        q = self._gen_question()
-        self.math_q = q
-        socketio.emit('math_question', {
-            'player_idx': player_idx,
-            'question':   q['text'],
-            'choices':    q['choices'],
-        }, room=self.room_id)
+        # Gera uma conta diferente para cada jogador
+        q0 = self._gen_question()
+        q1 = self._gen_question()
+        self.math_questions = [q0, q1]
+        self.math_answered  = [False, False]
+        self.math_results   = [None, None]
+
+        for i, sid in enumerate(self.sids):
+            q = self.math_questions[i]
+            socketio.emit('math_question', {
+                'player_idx': player_idx,  # quem causou o desafio (para exibição)
+                'for_me':     True,        # ambos respondem
+                'question':   q['text'],
+                'choices':    q['choices'],
+            }, to=sid)
+
         # auto-timeout after 8s
         def timeout():
             time.sleep(8)
-            if self.math_active:
-                self._answer_math(-1)  # timeout = wrong
+            for i in range(2):
+                if not self.math_answered[i]:
+                    self._resolve_player_math(i, -1)
+            self._finalize_math()
         threading.Thread(target=timeout, daemon=True).start()
 
-    def _answer_math(self, chosen_idx):
-        if not self.math_active:
+    def _resolve_player_math(self, player_idx, chosen_idx):
+        if self.math_answered[player_idx]:
             return
-        correct = chosen_idx == self.math_q['correct_idx']
-        if correct:
-            self.speed_mult = max(0.7, self.speed_mult * 0.88)
-            feedback = 'correct'
-        else:
-            self.speed_mult = min(1.8, self.speed_mult * 1.15)
-            feedback = 'wrong' if chosen_idx != -1 else 'timeout'
+        self.math_answered[player_idx] = True
+        q = self.math_questions[player_idx]
+        correct = chosen_idx == q['correct_idx']
+        feedback = 'correct' if correct else ('wrong' if chosen_idx != -1 else 'timeout')
+        self.math_results[player_idx] = correct
+        sid = self.sids[player_idx]
         socketio.emit('math_result', {
             'feedback':    feedback,
-            'correct_idx': self.math_q['correct_idx'],
-        }, room=self.room_id)
+            'correct_idx': q['correct_idx'],
+        }, to=sid)
+        if all(self.math_answered):
+            threading.Thread(target=self._finalize_math, daemon=True).start()
+
+    def _finalize_math(self):
+        if not self.math_active:
+            return
         time.sleep(1.3)
         self.math_active = False
+        # Aplica efeito baseado nos resultados de cada um
+        r = self.math_results
+        if r[0] is True and r[1] is True:
+            self.speed_mult = max(0.7, self.speed_mult * 0.92)
+        elif r[0] is False and r[1] is False:
+            self.speed_mult = min(1.8, self.speed_mult * 1.15)
+        elif r[0] is True and r[1] is not True:
+            self.speed_mult = max(0.7, self.speed_mult * 0.85)
+        elif r[1] is True and r[0] is not True:
+            self.speed_mult = min(1.8, self.speed_mult * 1.2)
         # Reapply speed
         b = self.ball
         spd = math.sqrt(b['vx']**2 + b['vy']**2)
@@ -286,8 +312,8 @@ class GameRoom:
 
     def answer_math(self, sid, chosen_idx):
         if sid in self.players and self.math_active:
-            if self.players[sid]['idx'] == self.math_player:
-                threading.Thread(target=self._answer_math, args=(chosen_idx,), daemon=True).start()
+            player_idx = self.players[sid]['idx']
+            threading.Thread(target=self._resolve_player_math, args=(player_idx, chosen_idx), daemon=True).start()
 
     def remove_player(self, sid):
         self.running = False
@@ -378,4 +404,4 @@ def on_disconnect():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    socketio.run(app, host='0.0.0.0', port=port, debug=False, allow_unsafe_werkzeug=True)
+    socketio.run(app, host='0.0.0.0', port=port, debug=False)
