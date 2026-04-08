@@ -627,6 +627,9 @@ let scores     = [0, 0];
 let particles  = [];
 let animFrame  = null;
 let armSwing   = 0;
+let reverseControls = false;
+let paddleScaleP0 = 1.0;
+let paddleScaleP1 = 1.0;
 
 // ══ DRAW SCENE (CLASSIC PONG 2D) ══════════════════════════════════════════════
 function drawBackground() {
@@ -761,7 +764,8 @@ let paddleMoveInterval = null;
 const MOVE_SPEED = 0.032;
 
 function movePaddle(dir) {
-  myPaddleY = Math.max(-1+PADDLE_H, Math.min(1-PADDLE_H, myPaddleY + dir*MOVE_SPEED));
+  const d = reverseControls ? -dir : dir;
+  myPaddleY = Math.max(-1+PADDLE_H, Math.min(1-PADDLE_H, myPaddleY + d*MOVE_SPEED));
   if (roomId) socket.emit('move_paddle', { room_id: roomId, y: myPaddleY });
 }
 
@@ -1015,10 +1019,6 @@ document.addEventListener('keydown', e=>{
 });
 
 // ══ EFEITOS DE PADDLE E CONTROLES ═══════════════════════════════════════════
-let paddleScaleP0 = 1.0;
-let paddleScaleP1 = 1.0;
-let reverseControls = false;
-
 socket.on('effect_paddle', data => {
   if (data.player_idx === 0) paddleScaleP0 = data.size;
   else paddleScaleP1 = data.size;
@@ -1056,11 +1056,7 @@ function showEffectToast(msg) {
   }
 }
 
-// Patch movePaddle to support reverse controls
-const _origMovePaddle = movePaddle;
-function movePaddle(dir) {
-  _origMovePaddle(reverseControls ? -dir : dir);
-}
+// reverseControls já integrado no movePaddle original
 
 // Patch drawPaddleRect to support size effects
 const _origDrawPaddleRect = drawPaddleRect;
