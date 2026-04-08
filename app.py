@@ -54,7 +54,7 @@ def db_get_leaderboard():
         return []
 
 # ── GAME STATE ────────────────────────────────────────────────────────────────
-BALL_SPEED   = 0.005
+BALL_SPEED   = 0.009
 GAME_DURATION = 180  # 3 minutos em segundos
 PADDLE_H     = 0.22
 PADDLE_W     = 0.04
@@ -65,7 +65,8 @@ waiting = None        # socket_id esperando oponente
 waiting_lock = threading.Lock()
 
 class GameRoom:
-    def __init__(self, room_id, p1_sid, p1_info, p2_sid, p2_info):
+    def __init__(self, room_id, p1_sid, p1_info, p2_sid, p2_info, level=6):
+        self.level = level  # 6=6ºEF, 7=7ºEF, ... 12=3ºEM
         self.room_id  = room_id
         self.players  = {
             p1_sid: {'idx': 0, 'info': p1_info, 'paddle_y': 0.0},
@@ -238,12 +239,15 @@ class GameRoom:
                 'choices':    q['choices'],
             }, to=sid)
 
+        self._finalizing = False
         def timeout():
             time.sleep(5)
             for i in range(2):
                 if not self.math_answered[i]:
                     self._resolve_player_math(i, -1)
-            self._finalize_math()
+            # Only finalize if not already being finalized by answer
+            if not self._finalizing:
+                self._finalize_math()
         threading.Thread(target=timeout, daemon=True).start()
 
     def _resolve_player_math(self, player_idx, chosen_idx):
@@ -259,7 +263,7 @@ class GameRoom:
             'feedback':    feedback,
             'correct_idx': q['correct_idx'],
         }, to=sid)
-        if all(self.math_answered):
+        if all(self.math_answered) and not self._finalizing:
             threading.Thread(target=self._finalize_math, daemon=True).start()
 
     # Efeitos disponíveis na roleta para quem acertar
@@ -323,10 +327,14 @@ class GameRoom:
     def _finalize_math(self):
         if not self.math_active:
             return
-        time.sleep(1.3)
+        # Prevent double execution (timeout + answer both calling finalize)
+        if hasattr(self, '_finalizing') and self._finalizing:
+            return
+        self._finalizing = True
+
+        time.sleep(1.2)
         r = self.math_results
 
-        # Determine winner of math round
         winner_idx = None
         if r[0] is True and r[1] is not True:
             winner_idx = 0
@@ -334,22 +342,20 @@ class GameRoom:
             winner_idx = 1
 
         if winner_idx is not None:
-            # Roll the roulette for the winner!
             effect = self._roll_effect()
-            # Send roulette spin event to all players (includes effect so client can show it after animation)
             socketio.emit('roulette_spin', {
                 'winner_idx': winner_idx,
                 'effect': effect,
                 'all_effects': [e['label'] for e in self.WINNER_EFFECTS],
             }, room=self.room_id)
-            time.sleep(4.0)  # wait for full roulette animation
+            time.sleep(4.2)  # wait for full roulette animation + buffer
             self._apply_effect(effect['id'], winner_idx)
         else:
-            # Both correct → slow down; both wrong → speed up
             if r[0] is True and r[1] is True:
-                self.speed_mult = max(0.5, self.speed_mult * 0.88)
+                self.speed_mult = max(0.6, self.speed_mult * 0.9)
             elif r[0] is False and r[1] is False:
-                self.speed_mult = min(1.6, self.speed_mult * 1.12)
+                self.speed_mult = min(1.5, self.speed_mult * 1.1)
+            # reapply speed to ball
             b = self.ball
             spd = math.sqrt(b['vx']**2 + b['vy']**2)
             new_spd = BALL_SPEED * self.speed_mult
@@ -359,22 +365,39 @@ class GameRoom:
                 b['vy'] *= ratio
 
         self.math_active = False
+        self._finalizing = False
 
     def _gen_question(self):
-        ops = ['+', '-', '×', '÷']
-        diff = min(self.rally // 6, 3)
-        if diff == 0:
-            a  = random.randint(1, 10)
-            b  = random.randint(1, 10)
+        # Level-based difficulty: 6=6ºEF … 12=3ºEM
+        lv = self.level  # 6-12
+        if lv <= 6:
+            a  = random.randint(1, 15)
+            b  = random.randint(1, 15)
             op = random.choice(['+', '-'])
-        elif diff == 1:
-            a  = random.randint(1, 20)
+        elif lv == 7:
+            a  = random.randint(1, 30)
             b  = random.randint(1, 20)
             op = random.choice(['+', '-', '×'])
-        else:
+        elif lv == 8:
+            a  = random.randint(2, 20)
+            b  = random.randint(2, 10)
+            op = random.choice(['+', '-', '×', '÷'])
+        elif lv == 9:
             a  = random.randint(5, 50)
-            b  = random.randint(2, 15)
-            op = random.choice(ops)
+            b  = random.randint(2, 20)
+            op = random.choice(['+', '-', '×', '÷'])
+        elif lv == 10:
+            a  = random.randint(10, 100)
+            b  = random.randint(2, 25)
+            op = random.choice(['+', '-', '×', '÷'])
+        elif lv == 11:
+            a  = random.randint(10, 200)
+            b  = random.randint(5, 30)
+            op = random.choice(['+', '-', '×', '÷'])
+        else:  # 12 = 3ºEM
+            a  = random.randint(20, 500)
+            b  = random.randint(5, 50)
+            op = random.choice(['+', '-', '×', '÷'])
 
         if op == '+':   answer = a + b
         elif op == '-': answer = a - b
@@ -385,8 +408,9 @@ class GameRoom:
             op = '÷'
 
         wrongs = set()
+        spread = max(3, abs(answer) // 5 + 1)
         while len(wrongs) < 3:
-            delta = random.randint(1, 8)
+            delta = random.randint(1, spread)
             w = answer + (delta if random.random() < 0.5 else -delta)
             if w != answer:
                 wrongs.add(w)
@@ -438,7 +462,9 @@ def on_join_queue(data):
     sid   = request.sid
     name  = data.get('name', 'Anônimo').strip()[:30]
     turma = data.get('turma', '').strip()[:20]
+    level = int(data.get('level', 6))  # 6–12 = 6ºEF ao 3ºEM
     player_info = db_get_or_create_player(name, turma)
+    player_info['level'] = level
 
     with waiting_lock:
         if waiting and waiting['sid'] != sid:
@@ -448,10 +474,13 @@ def on_join_queue(data):
             join_room(room_id, sid=w['sid'])
             join_room(room_id, sid=sid)
 
+            # Average level between the two players
+            avg_level = (w['info'].get('level', 6) + player_info.get('level', 6)) // 2
             room = GameRoom(
                 room_id,
                 w['sid'], w['info'],
                 sid,      player_info,
+                level=avg_level,
             )
             rooms[room_id] = room
 
