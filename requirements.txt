@@ -1,5 +1,4 @@
 flask==3.0.3
 flask-socketio==5.3.6
 supabase==2.4.6
-eventlet==0.35.2
 gunicorn==22.0.0
