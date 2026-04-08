@@ -54,7 +54,7 @@ def db_get_leaderboard():
         return []
 
 # ── GAME STATE ────────────────────────────────────────────────────────────────
-BALL_SPEED   = 0.008
+BALL_SPEED   = 0.005
 GAME_DURATION = 180  # 3 minutos em segundos
 PADDLE_H     = 0.22
 PADDLE_W     = 0.04
@@ -242,27 +242,100 @@ class GameRoom:
         if all(self.math_answered):
             threading.Thread(target=self._finalize_math, daemon=True).start()
 
+    # Efeitos disponíveis na roleta para quem acertar
+    WINNER_EFFECTS = [
+        {'id': 'slow',      'label': '🐢 Bola lenta!',        'desc': 'Velocidade reduzida'},
+        {'id': 'fast_opp',  'label': '⚡ Inimigo acelerado!',  'desc': 'Oponente fica mais rápido'},
+        {'id': 'big_paddle','label': '🏓 Raquete gigante!',    'desc': 'Sua raquete cresce'},
+        {'id': 'tiny_opp',  'label': '🔬 Raquete minúscula!',  'desc': 'Raquete do inimigo encolhe'},
+        {'id': 'reverse',   'label': '🔄 Controles invertidos!','desc': 'Inimigo com controles trocados'},
+        {'id': 'freeze',    'label': '🧊 Congelar bola!',      'desc': 'Bola para por 2 segundos'},
+    ]
+
+    def _roll_effect(self):
+        return random.choice(self.WINNER_EFFECTS)
+
+    def _apply_effect(self, effect_id, winner_idx):
+        loser_idx = 1 - winner_idx
+        b = self.ball
+
+        if effect_id == 'slow':
+            self.speed_mult = max(0.4, self.speed_mult * 0.7)
+        elif effect_id == 'fast_opp':
+            self.speed_mult = min(2.0, self.speed_mult * 1.3)
+        elif effect_id == 'big_paddle':
+            # Send paddle resize to winner
+            socketio.emit('effect_paddle', {'size': 1.7, 'player_idx': winner_idx}, room=self.room_id)
+            def reset_paddle():
+                time.sleep(6)
+                socketio.emit('effect_paddle', {'size': 1.0, 'player_idx': winner_idx}, room=self.room_id)
+            threading.Thread(target=reset_paddle, daemon=True).start()
+        elif effect_id == 'tiny_opp':
+            socketio.emit('effect_paddle', {'size': 0.45, 'player_idx': loser_idx}, room=self.room_id)
+            def reset_opp():
+                time.sleep(6)
+                socketio.emit('effect_paddle', {'size': 1.0, 'player_idx': loser_idx}, room=self.room_id)
+            threading.Thread(target=reset_opp, daemon=True).start()
+        elif effect_id == 'reverse':
+            socketio.emit('effect_reverse', {'player_idx': loser_idx}, room=self.room_id)
+            def reset_reverse():
+                time.sleep(5)
+                socketio.emit('effect_reverse', {'player_idx': -1}, room=self.room_id)
+            threading.Thread(target=reset_reverse, daemon=True).start()
+        elif effect_id == 'freeze':
+            self.math_active = True  # pause ball briefly
+            def unfreeze():
+                time.sleep(2)
+                self.math_active = False
+            threading.Thread(target=unfreeze, daemon=True).start()
+
+        # Adjust ball speed after effect
+        spd = math.sqrt(b['vx']**2 + b['vy']**2)
+        new_spd = BALL_SPEED * self.speed_mult
+        if spd > 0 and effect_id not in ('big_paddle', 'tiny_opp', 'reverse', 'freeze'):
+            ratio = new_spd / spd
+            b['vx'] *= ratio
+            b['vy'] *= ratio
+
     def _finalize_math(self):
         if not self.math_active:
             return
         time.sleep(1.3)
-        self.math_active = False
         r = self.math_results
-        if r[0] is True and r[1] is True:
-            self.speed_mult = max(0.7, self.speed_mult * 0.92)
-        elif r[0] is False and r[1] is False:
-            self.speed_mult = min(1.8, self.speed_mult * 1.15)
-        elif r[0] is True and r[1] is not True:
-            self.speed_mult = max(0.7, self.speed_mult * 0.85)
+
+        # Determine winner of math round
+        winner_idx = None
+        if r[0] is True and r[1] is not True:
+            winner_idx = 0
         elif r[1] is True and r[0] is not True:
-            self.speed_mult = min(1.8, self.speed_mult * 1.2)
-        b = self.ball
-        spd = math.sqrt(b['vx']**2 + b['vy']**2)
-        new_spd = BALL_SPEED * self.speed_mult
-        if spd > 0:
-            ratio = new_spd / spd
-            b['vx'] *= ratio
-            b['vy'] *= ratio
+            winner_idx = 1
+
+        if winner_idx is not None:
+            # Roll the roulette for the winner!
+            effect = self._roll_effect()
+            # Send roulette spin event to all players
+            socketio.emit('roulette_spin', {
+                'winner_idx': winner_idx,
+                'effect': effect,
+                'all_effects': [e['label'] for e in self.WINNER_EFFECTS],
+            }, room=self.room_id)
+            time.sleep(3.5)  # wait for roulette animation
+            self._apply_effect(effect['id'], winner_idx)
+        else:
+            # Both correct → slow down; both wrong → speed up
+            if r[0] is True and r[1] is True:
+                self.speed_mult = max(0.5, self.speed_mult * 0.88)
+            elif r[0] is False and r[1] is False:
+                self.speed_mult = min(1.6, self.speed_mult * 1.12)
+            b = self.ball
+            spd = math.sqrt(b['vx']**2 + b['vy']**2)
+            new_spd = BALL_SPEED * self.speed_mult
+            if spd > 0:
+                ratio = new_spd / spd
+                b['vx'] *= ratio
+                b['vy'] *= ratio
+
+        self.math_active = False
 
     def _gen_question(self):
         ops = ['+', '-', '×', '÷']
