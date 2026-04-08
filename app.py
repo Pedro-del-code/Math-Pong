@@ -78,6 +78,7 @@ class GameRoom:
         self.math_player = -1
         self.math_q   = None
         self.speed_mult = 1.0
+        self.paddle_scales = [1.0, 1.0]  # visual + hitbox scales
         self.rally    = 0
         self.last_hit = -1
         self.time_left = GAME_DURATION
@@ -115,68 +116,87 @@ class GameRoom:
 
     def _update(self):
         b  = self.ball
-        steps = 4
-        for _ in range(steps):
-            b['x'] += b['vx']
-            b['y'] += b['vy']
 
-            # Top/bottom bounce
-            if b['y'] < -1 + BALL_R:
-                b['y']  =  -1 + BALL_R
-                b['vy'] =  abs(b['vy'])
-            if b['y'] >  1 - BALL_R:
-                b['y']  =   1 - BALL_R
-                b['vy'] = -abs(b['vy'])
+        # Clamp speed so it never exceeds MAX_SPEED
+        MAX_SPEED = BALL_SPEED * 1.8
+        spd = math.sqrt(b['vx']**2 + b['vy']**2)
+        if spd > MAX_SPEED:
+            ratio = MAX_SPEED / spd
+            b['vx'] *= ratio
+            b['vy'] *= ratio
 
-            p0y = self.players[self.sids[0]]['paddle_y']
-            p1y = self.players[self.sids[1]]['paddle_y']
+        b['x'] += b['vx']
+        b['y'] += b['vy']
 
-            # Left paddle P1
-            if b['x'] < -0.9 + PADDLE_W + BALL_R and b['vx'] < 0 and self.last_hit != 0:
-                if abs(b['y'] - p0y) < PADDLE_H + BALL_R:
-                    b['x'] = -0.9 + PADDLE_W + BALL_R
-                    relY   = (b['y'] - p0y) / PADDLE_H
-                    speed  = math.sqrt(b['vx']**2 + b['vy']**2) * 1.01
-                    angle  = relY * math.pi * 0.38
-                    b['vx'] =  abs(math.cos(angle)) * speed
-                    b['vy'] =  math.sin(angle) * speed
-                    self.last_hit = 0
-                    self.rally   += 1
-                    if self.rally % 3 == 0:
-                        self._trigger_math(0)
+        # Top/bottom bounce
+        if b['y'] < -1 + BALL_R:
+            b['y']  =  -1 + BALL_R
+            b['vy'] =  abs(b['vy'])
+        if b['y'] >  1 - BALL_R:
+            b['y']  =   1 - BALL_R
+            b['vy'] = -abs(b['vy'])
 
-            # Right paddle P2
-            if b['x'] >  0.9 - PADDLE_W - BALL_R and b['vx'] > 0 and self.last_hit != 1:
-                if abs(b['y'] - p1y) < PADDLE_H + BALL_R:
-                    b['x'] =  0.9 - PADDLE_W - BALL_R
-                    relY   = (b['y'] - p1y) / PADDLE_H
-                    speed  = math.sqrt(b['vx']**2 + b['vy']**2) * 1.01
-                    angle  = relY * math.pi * 0.38
-                    b['vx'] = -abs(math.cos(angle)) * speed
-                    b['vy'] =  math.sin(angle) * speed
-                    self.last_hit = 1
-                    self.rally   += 1
-                    if self.rally % 3 == 0:
-                        self._trigger_math(1)
+        p0y = self.players[self.sids[0]]['paddle_y']
+        p1y = self.players[self.sids[1]]['paddle_y']
 
-            # Score
-            if b['x'] < -1.05:
-                self._point(1)
-                return
-            if b['x'] >  1.05:
-                self._point(0)
-                return
+        # Left paddle P0 — use paddle scale for hit area
+        scale0 = self.paddle_scales[0]
+        if b['x'] < -0.9 + PADDLE_W + BALL_R and b['vx'] < 0 and self.last_hit != 0:
+            if abs(b['y'] - p0y) < (PADDLE_H * scale0) + BALL_R:
+                b['x'] = -0.9 + PADDLE_W + BALL_R
+                relY   = (b['y'] - p0y) / (PADDLE_H * scale0)
+                # NO speed increase on hit — keep constant speed
+                speed  = BALL_SPEED * self.speed_mult
+                angle  = relY * math.pi * 0.38
+                b['vx'] =  abs(math.cos(angle)) * speed
+                b['vy'] =  math.sin(angle) * speed
+                self.last_hit = 0
+                self.rally   += 1
+                if self.rally % 3 == 0:
+                    self._trigger_math(0)
+
+        # Right paddle P1
+        scale1 = self.paddle_scales[1]
+        if b['x'] >  0.9 - PADDLE_W - BALL_R and b['vx'] > 0 and self.last_hit != 1:
+            if abs(b['y'] - p1y) < (PADDLE_H * scale1) + BALL_R:
+                b['x'] =  0.9 - PADDLE_W - BALL_R
+                relY   = (b['y'] - p1y) / (PADDLE_H * scale1)
+                speed  = BALL_SPEED * self.speed_mult
+                angle  = relY * math.pi * 0.38
+                b['vx'] = -abs(math.cos(angle)) * speed
+                b['vy'] =  math.sin(angle) * speed
+                self.last_hit = 1
+                self.rally   += 1
+                if self.rally % 3 == 0:
+                    self._trigger_math(1)
+
+        # Score
+        if b['x'] < -1.05:
+            self._point(1)
+            return
+        if b['x'] >  1.05:
+            self._point(0)
+            return
 
     def _point(self, player_idx):
         self.scores[player_idx] += 1
         self.rally    = 0
         self.last_hit = -1
         self.speed_mult = 1.0
+        self.paddle_scales = [1.0, 1.0]  # reset any paddle effects on point
         socketio.emit('score_update', {
             'scores': self.scores,
             'scorer': player_idx
         }, room=self.room_id)
-        self.reset_ball(1 if player_idx == 1 else -1)
+        # Notify clients to reset paddle sizes
+        socketio.emit('effect_paddle', {'size': 1.0, 'player_idx': 0}, room=self.room_id)
+        socketio.emit('effect_paddle', {'size': 1.0, 'player_idx': 1}, room=self.room_id)
+        # Brief pause before ball relaunch so players can reposition
+        self.ball = {'x': 0.0, 'y': 0.0, 'vx': 0.0, 'vy': 0.0}
+        def delayed_reset():
+            time.sleep(1.5)
+            self.reset_ball(1 if player_idx == 1 else -1)
+        threading.Thread(target=delayed_reset, daemon=True).start()
 
     def _end_game_by_time(self):
         self.running = False
@@ -264,16 +284,19 @@ class GameRoom:
         elif effect_id == 'fast_opp':
             self.speed_mult = min(2.0, self.speed_mult * 1.3)
         elif effect_id == 'big_paddle':
-            # Send paddle resize to winner
+            self.paddle_scales[winner_idx] = 1.7
             socketio.emit('effect_paddle', {'size': 1.7, 'player_idx': winner_idx}, room=self.room_id)
             def reset_paddle():
                 time.sleep(6)
+                self.paddle_scales[winner_idx] = 1.0
                 socketio.emit('effect_paddle', {'size': 1.0, 'player_idx': winner_idx}, room=self.room_id)
             threading.Thread(target=reset_paddle, daemon=True).start()
         elif effect_id == 'tiny_opp':
+            self.paddle_scales[loser_idx] = 0.45
             socketio.emit('effect_paddle', {'size': 0.45, 'player_idx': loser_idx}, room=self.room_id)
             def reset_opp():
                 time.sleep(6)
+                self.paddle_scales[loser_idx] = 1.0
                 socketio.emit('effect_paddle', {'size': 1.0, 'player_idx': loser_idx}, room=self.room_id)
             threading.Thread(target=reset_opp, daemon=True).start()
         elif effect_id == 'reverse':
@@ -313,13 +336,13 @@ class GameRoom:
         if winner_idx is not None:
             # Roll the roulette for the winner!
             effect = self._roll_effect()
-            # Send roulette spin event to all players
+            # Send roulette spin event to all players (includes effect so client can show it after animation)
             socketio.emit('roulette_spin', {
                 'winner_idx': winner_idx,
                 'effect': effect,
                 'all_effects': [e['label'] for e in self.WINNER_EFFECTS],
             }, room=self.room_id)
-            time.sleep(3.5)  # wait for roulette animation
+            time.sleep(4.0)  # wait for full roulette animation
             self._apply_effect(effect['id'], winner_idx)
         else:
             # Both correct → slow down; both wrong → speed up
