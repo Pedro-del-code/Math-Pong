@@ -54,8 +54,8 @@ def db_get_leaderboard():
         return []
 
 # ── GAME STATE ────────────────────────────────────────────────────────────────
-BALL_SPEED   = 0.022
-WIN_SCORE    = 7
+BALL_SPEED   = 0.013
+GAME_DURATION = 180  # 3 minutos em segundos
 PADDLE_H     = 0.22
 PADDLE_W     = 0.04
 BALL_R       = 0.025
@@ -80,6 +80,7 @@ class GameRoom:
         self.speed_mult = 1.0
         self.rally    = 0
         self.last_hit = -1
+        self.time_left = GAME_DURATION
         self.reset_ball(random.choice([1, -1]))
         self.thread   = None
 
@@ -101,10 +102,16 @@ class GameRoom:
         TICK = 1 / 60
         while self.running:
             time.sleep(TICK)
-            if self.math_active:
-                continue
+            if not self.math_active:
+                self.time_left -= TICK
+                if self.time_left <= 0:
+                    self.time_left = 0
+                    self._end_game_by_time()
+                    return
             self._update()
-            socketio.emit('game_state', self._state(), room=self.room_id)
+            state = self._state()
+            state['time_left'] = int(self.time_left)
+            socketio.emit('game_state', state, room=self.room_id)
 
     def _update(self):
         b  = self.ball
@@ -129,7 +136,7 @@ class GameRoom:
                 if abs(b['y'] - p0y) < PADDLE_H + BALL_R:
                     b['x'] = -0.9 + PADDLE_W + BALL_R
                     relY   = (b['y'] - p0y) / PADDLE_H
-                    speed  = math.sqrt(b['vx']**2 + b['vy']**2) * 1.05
+                    speed  = math.sqrt(b['vx']**2 + b['vy']**2) * 1.01
                     angle  = relY * math.pi * 0.38
                     b['vx'] =  abs(math.cos(angle)) * speed
                     b['vy'] =  math.sin(angle) * speed
@@ -143,7 +150,7 @@ class GameRoom:
                 if abs(b['y'] - p1y) < PADDLE_H + BALL_R:
                     b['x'] =  0.9 - PADDLE_W - BALL_R
                     relY   = (b['y'] - p1y) / PADDLE_H
-                    speed  = math.sqrt(b['vx']**2 + b['vy']**2) * 1.05
+                    speed  = math.sqrt(b['vx']**2 + b['vy']**2) * 1.01
                     angle  = relY * math.pi * 0.38
                     b['vx'] = -abs(math.cos(angle)) * speed
                     b['vy'] =  math.sin(angle) * speed
@@ -169,23 +176,26 @@ class GameRoom:
             'scores': self.scores,
             'scorer': player_idx
         }, room=self.room_id)
-        if self.scores[player_idx] >= WIN_SCORE:
-            self._end_game(player_idx)
-            return
         self.reset_ball(1 if player_idx == 1 else -1)
 
-    def _end_game(self, winner_idx):
+    def _end_game_by_time(self):
         self.running = False
+        if self.scores[0] > self.scores[1]:
+            winner_idx = 0
+        elif self.scores[1] > self.scores[0]:
+            winner_idx = 1
+        else:
+            winner_idx = random.choice([0, 1])  # empate: sorteio
         winner_sid  = self.sids[winner_idx]
         winner_info = self.players[winner_sid]['info']
         db_add_win(winner_info.get('id'))
         leaderboard = db_get_leaderboard()
         socketio.emit('game_over', {
-            'winner_idx':  winner_idx,
-            'winner_name': winner_info['name'],
+            'winner_idx':   winner_idx,
+            'winner_name':  winner_info['name'],
             'winner_turma': winner_info['turma'],
-            'scores':      self.scores,
-            'leaderboard': leaderboard,
+            'scores':       self.scores,
+            'leaderboard':  leaderboard,
         }, room=self.room_id)
 
     def _trigger_math(self, player_idx):
@@ -209,7 +219,7 @@ class GameRoom:
             }, to=sid)
 
         def timeout():
-            time.sleep(8)
+            time.sleep(5)
             for i in range(2):
                 if not self.math_answered[i]:
                     self._resolve_player_math(i, -1)
