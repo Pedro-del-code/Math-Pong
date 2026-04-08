@@ -522,6 +522,46 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
 }
 #roulette-result.show { opacity:1; transform:translateY(0); }
 
+
+/* ── SETTINGS LEVEL GRID ── */
+.level-btn {
+  font-family:'Orbitron',sans-serif;
+  font-size:10px; font-weight:700; letter-spacing:1px;
+  padding:12px 6px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+  color:rgba(255,255,255,0.4);
+  cursor:pointer; border-radius:8px;
+  transition: all .2s; text-align:center; line-height:1.4;
+}
+.level-btn:hover { border-color:rgba(255,204,0,0.4); color:rgba(255,204,0,0.8); }
+.level-btn.selected {
+  border-color: var(--gold);
+  background: rgba(255,204,0,0.1);
+  color: var(--gold);
+  text-shadow: 0 0 12px var(--gold);
+  box-shadow: 0 0 16px rgba(255,204,0,0.2);
+}
+
+/* ── LEADERBOARD PODIUM (inside modal) ── */
+.lb-podium-col { display:flex;flex-direction:column;align-items:center;gap:4px; }
+.lb-podium-bar {
+  width:clamp(70px,20vw,90px);
+  border-radius:6px 6px 0 0;
+  display:flex;flex-direction:column-reverse;align-items:center;
+  justify-content:flex-start;padding-bottom:10px;padding-top:8px;
+}
+.lb-bar-1 { height:120px; background:linear-gradient(to top,#b8860033,#ffcc0044); border:1px solid var(--gold); }
+.lb-bar-2 { height:88px;  background:linear-gradient(to top,#33333322,#88888833); border:1px solid #555; }
+.lb-bar-3 { height:64px;  background:linear-gradient(to top,#5c3a1e33,#cd7f3244); border:1px solid #cd7f32; }
+.lb-podium-wins { font-size:clamp(16px,5vw,22px);font-weight:900; }
+.lb-bar-1 .lb-podium-wins { color:var(--gold); }
+.lb-bar-2 .lb-podium-wins { color:#aaa; }
+.lb-bar-3 .lb-podium-wins { color:#cd7f32; }
+.lb-podium-name { font-size:clamp(8px,2.5vw,11px);letter-spacing:1px;text-align:center;line-height:1.3;padding:0 4px; }
+.lb-podium-crown { font-size:20px;margin-bottom:2px; }
+.lb-podium-rank { font-size:9px;color:#555;letter-spacing:2px; }
+
 </style>
 </head>
 <body>
@@ -540,6 +580,10 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
     <input id="inp-name"  type="text" placeholder="SEU NOME" maxlength="30" autocomplete="off" spellcheck="false">
     <input id="inp-turma" type="text" placeholder="SUA TURMA (ex: 9A)" maxlength="20" autocomplete="off" spellcheck="false">
     <button class="btn-primary" onclick="joinQueue()"><span>JOGAR AGORA</span></button>
+    <div style="display:flex;gap:8px;margin-top:4px;position:relative;z-index:1;">
+      <button class="btn-secondary" onclick="showSettings()" style="flex:1;padding:12px;font-size:11px;letter-spacing:2px;">⚙ CONFIGURAR</button>
+      <button class="btn-secondary" onclick="showLeaderboard()" style="flex:1;padding:12px;font-size:11px;letter-spacing:2px;">🏆 RANKING</button>
+    </div>
   </div>
 </div>
 
@@ -668,13 +712,16 @@ function gy(v) { return cy + v * cy * 0.88; }
 function gs(v) { return v * Math.min(W, H) * 0.88 * 0.5; }
 
 function drawPaddleRect(px, py, isP1) {
+  // Apply size effect (big_paddle / tiny_opp)
+  const playerIdx = isP1 ? 0 : 1;
+  const scale = playerIdx === 0 ? paddleScaleP0 : paddleScaleP1;
+
   const color = isP1 ? '#00eeff' : '#ff4466';
-  const glowColor = isP1 ? 'rgba(0,238,255,' : 'rgba(255,68,102,';
   const sw = gs(PADDLE_W * 2);
-  const sh = gs(PADDLE_H * 2);
+  const sh = gs(PADDLE_H * 2) * scale;
   const sx = gx(px) - sw / 2;
   const sy = gy(py) - sh / 2;
-  const r  = sw * 0.35; // corner radius
+  const r  = sw * 0.35;
 
   ctx.save();
   // Outer glow
@@ -828,8 +875,9 @@ socket.on('match_found', data=>{
 
   document.getElementById('label0').textContent = myIdx===0 ? myName.toUpperCase() : data.opponent.toUpperCase();
   document.getElementById('label1').textContent = myIdx===1 ? myName.toUpperCase() : data.opponent.toUpperCase();
+  const lvlName = {6:'6ºEF',7:'7ºEF',8:'8ºEF',9:'9ºEF',10:'1ºEM',11:'2ºEM',12:'3ºEM'};
   document.getElementById('opponent-label').textContent =
-    `VS  ${data.opponent.toUpperCase()}  ·  ${data.turma.toUpperCase()}`;
+    `VS  ${data.opponent.toUpperCase()}  ·  ${data.turma.toUpperCase()}  ·  ${lvlName[selectedLevel]||''}`;
 
   document.querySelector('#s0 .score-val').textContent='0';
   document.querySelector('#s1 .score-val').textContent='0';
@@ -1017,7 +1065,8 @@ function joinQueue() {
     return;
   }
   myName = name;
-  socket.emit('join_queue', { name, turma });
+  const lvl = parseInt(localStorage.getItem('mathpong_level') || '7');
+  socket.emit('join_queue', { name, turma, level: lvl });
   show('screen-waiting');
   hide('screen-menu');
 }
@@ -1056,8 +1105,13 @@ if (!('ontouchstart' in window)) {
 socket.on('effect_paddle', data => {
   if (data.player_idx === 0) paddleScaleP0 = data.size;
   else paddleScaleP1 = data.size;
-  // Show brief toast
-  showEffectToast(data.size > 1 ? '🏓 Raquete gigante!' : '🔬 Raquete minúscula!');
+  if (data.size !== 1.0) {
+    const isMe = data.player_idx === myIdx;
+    showEffectToast(isMe
+      ? (data.size > 1 ? '🏓 Sua raquete ficou gigante!' : '🔬 Sua raquete encolheu!')
+      : (data.size > 1 ? '😱 Raquete do inimigo cresceu!' : '😈 Raquete do inimigo encolheu!')
+    );
+  }
 });
 
 socket.on('effect_reverse', data => {
@@ -1092,38 +1146,7 @@ function showEffectToast(msg) {
 
 // reverseControls já integrado no movePaddle original
 
-// Patch drawPaddleRect to support size effects
-const _origDrawPaddleRect = drawPaddleRect;
-function drawPaddleRect(px, py, isP1) {
-  // Determine which player this paddle belongs to
-  const playerIdx = isP1 ? 0 : 1;
-  const scale = playerIdx === 0 ? paddleScaleP0 : paddleScaleP1;
-
-  const color = isP1 ? '#00eeff' : '#ff4466';
-  const sw = gs(PADDLE_W * 2);
-  const sh = gs(PADDLE_H * 2) * scale;  // apply scale
-  const sx = gx(px) - sw / 2;
-  const sy = gy(py) - sh / 2;
-  const r  = sw * 0.35;
-
-  ctx.save();
-  ctx.shadowColor = color;
-  ctx.shadowBlur  = 28;
-  const grad = ctx.createLinearGradient(sx, sy, sx + sw, sy + sh);
-  grad.addColorStop(0, color);
-  grad.addColorStop(0.5, isP1 ? 'rgba(0,238,255,0.7)' : 'rgba(255,68,102,0.7)');
-  grad.addColorStop(1, color);
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.roundRect(sx, sy, sw, sh, r);
-  ctx.fill();
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = isP1 ? 'rgba(180,255,255,0.2)' : 'rgba(255,180,190,0.2)';
-  ctx.beginPath();
-  ctx.roundRect(sx + sw*0.15, sy + sh*0.05, sw*0.3, sh*0.9, r*0.5);
-  ctx.fill();
-  ctx.restore();
-}
+// drawPaddleRect already handles scale via paddleScaleP0/P1 globals (applied in original definition)
 
 // ══ ROLETA DE EFEITOS ════════════════════════════════════════════════════════
 socket.on('roulette_spin', data => {
@@ -1223,6 +1246,131 @@ function showRoulette(data) {
   });
 }
 
+
+// ══ CONFIGURAÇÕES / NÍVEL ═════════════════════════════════════════════════════
+const LEVELS = [
+  { id: 6,  label: '6º ANO',  sub: 'EF' },
+  { id: 7,  label: '7º ANO',  sub: 'EF' },
+  { id: 8,  label: '8º ANO',  sub: 'EF' },
+  { id: 9,  label: '9º ANO',  sub: 'EF' },
+  { id: 10, label: '1º ANO',  sub: 'EM' },
+  { id: 11, label: '2º ANO',  sub: 'EM' },
+  { id: 12, label: '3º ANO',  sub: 'EM' },
+];
+const LEVEL_DESC = {
+  6:  'Adição e subtração até 15',
+  7:  'Adição, subtração e multiplicação até 30',
+  8:  'As 4 operações, números até 20',
+  9:  'As 4 operações, números maiores',
+  10: 'Operações com números até 100',
+  11: 'Operações com números até 200',
+  12: 'Operações com números até 500',
+};
+
+let selectedLevel = parseInt(localStorage.getItem('mathpong_level') || '7');
+
+function showSettings() {
+  const grid = document.getElementById('level-grid');
+  grid.innerHTML = '';
+  LEVELS.forEach(lv => {
+    const btn = document.createElement('button');
+    btn.className = 'level-btn' + (lv.id === selectedLevel ? ' selected' : '');
+    btn.innerHTML = `<div>${lv.label}</div><div style="font-size:8px;color:#555;letter-spacing:1px;">${lv.sub}</div>`;
+    btn.onclick = () => selectLevel(lv.id);
+    grid.appendChild(btn);
+  });
+  updateLevelDesc();
+  show('screen-settings');
+  hide('screen-menu');
+}
+
+function selectLevel(id) {
+  selectedLevel = id;
+  document.querySelectorAll('.level-btn').forEach((b, i) => {
+    b.classList.toggle('selected', LEVELS[i].id === id);
+  });
+  updateLevelDesc();
+}
+
+function updateLevelDesc() {
+  document.getElementById('level-desc').textContent = LEVEL_DESC[selectedLevel] || '';
+}
+
+function closeSettings() {
+  localStorage.setItem('mathpong_level', selectedLevel);
+  hide('screen-settings');
+  show('screen-menu');
+}
+
+// ══ LEADERBOARD MODAL ════════════════════════════════════════════════════════
+async function showLeaderboard() {
+  hide('screen-menu');
+  show('screen-leaderboard');
+  document.getElementById('lb-podium').innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:11px;color:#222;letter-spacing:3px;">CARREGANDO...</div>';
+  document.getElementById('lb-rest').innerHTML = '';
+  document.getElementById('lb-empty').style.display = 'none';
+
+  try {
+    const res  = await fetch('/leaderboard');
+    const data = await res.json();
+    buildLbPodium(data);
+  } catch(e) {
+    document.getElementById('lb-podium').innerHTML = '';
+    document.getElementById('lb-empty').style.display = 'block';
+  }
+}
+
+function buildLbPodium(lb) {
+  const podium = document.getElementById('lb-podium');
+  const rest   = document.getElementById('lb-rest');
+  podium.innerHTML = '';
+  rest.innerHTML   = '';
+
+  if (!lb.length) {
+    document.getElementById('lb-empty').style.display = 'block';
+    return;
+  }
+
+  const top3  = lb.slice(0, 3);
+  const order = [1, 0, 2]; // visual: silver, gold, bronze
+  const bars  = ['lb-bar-2', 'lb-bar-1', 'lb-bar-3'];
+  const crowns = ['', '👑', ''];
+  const ranks  = ['#2', '#1', '#3'];
+
+  order.forEach(i => {
+    if (!top3[i]) return;
+    const p   = top3[i];
+    const vi  = order.indexOf(i); // visual position index
+    const col = document.createElement('div');
+    col.className = 'lb-podium-col';
+    col.innerHTML = `
+      <div class="lb-podium-rank">${ranks[vi]}</div>
+      <div class="lb-podium-bar ${bars[vi]}">
+        ${crowns[vi] ? `<div class="lb-podium-crown">${crowns[vi]}</div>` : ''}
+        <div class="lb-podium-wins">${p.wins}</div>
+        <div class="lb-podium-name">${p.name.toUpperCase()}<br>
+          <span style="color:#333;font-size:8px;">${p.turma || ''}</span>
+        </div>
+      </div>`;
+    podium.appendChild(col);
+  });
+
+  lb.slice(3).forEach((p, i) => {
+    const row = document.createElement('div');
+    row.innerHTML = `<span style="color:#333">#${i+4}</span> &nbsp; ${p.name.toUpperCase()} &nbsp; <span style="color:#222">${p.turma || ''}</span> &nbsp; <span style="color:#555">${p.wins} vit</span>`;
+    rest.appendChild(row);
+  });
+}
+
+function closeLeaderboard() {
+  hide('screen-leaderboard');
+  show('screen-menu');
+}
+
+// joinQueue already sends level (defined above)
+
+// Level shown in opponent label via the existing match_found handler above
+
 </script>
 
 <!-- ══ ROULETTE OVERLAY ════════════════════════════════════════════════════════ -->
@@ -1235,6 +1383,30 @@ function showRoulette(data) {
     <div id="roulette-track"></div>
   </div>
   <div id="roulette-result"></div>
+</div>
+
+
+<!-- ══ SETTINGS MODAL ══════════════════════════════════════════════════════════ -->
+<div id="screen-settings" class="screen hidden" style="background:rgba(0,2,8,0.97);z-index:500;">
+  <div style="font-size:10px;letter-spacing:6px;color:var(--gold);text-shadow:0 0 14px rgba(255,204,0,0.7);border:1px solid rgba(255,204,0,0.2);padding:5px 16px;border-radius:3px;margin-bottom:18px;">⚙ CONFIGURAÇÕES</div>
+  <div style="font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:3px;color:#444;margin-bottom:16px;">NÍVEL DE DIFICULDADE DAS QUESTÕES</div>
+
+  <div id="level-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:min(320px,85vw);margin-bottom:24px;">
+    <!-- filled by JS -->
+  </div>
+
+  <div id="level-desc" style="font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;color:var(--gold);min-height:18px;text-align:center;margin-bottom:20px;"></div>
+
+  <button class="btn-primary" onclick="closeSettings()"><span>SALVAR</span></button>
+</div>
+
+<!-- ══ LEADERBOARD MODAL ════════════════════════════════════════════════════════ -->
+<div id="screen-leaderboard" class="screen hidden" style="background:rgba(0,2,8,0.97);z-index:500;overflow-y:auto;padding:20px 0;">
+  <div style="font-size:10px;letter-spacing:6px;color:var(--gold);text-shadow:0 0 14px rgba(255,204,0,0.7);border:1px solid rgba(255,204,0,0.2);padding:5px 16px;border-radius:3px;margin-bottom:18px;">🏆 RANKING GERAL</div>
+  <div id="lb-podium" style="display:flex;align-items:flex-end;gap:8px;margin-bottom:16px;"></div>
+  <div id="lb-rest" style="font-family:'Share Tech Mono',monospace;font-size:11px;color:#444;letter-spacing:2px;line-height:2.2;text-align:center;width:min(300px,85vw);"></div>
+  <div id="lb-empty" style="font-family:'Share Tech Mono',monospace;font-size:11px;color:#222;letter-spacing:3px;display:none;">SEM DADOS AINDA</div>
+  <button class="btn-secondary" onclick="closeLeaderboard()" style="margin-top:20px;">VOLTAR</button>
 </div>
 
 </body>
