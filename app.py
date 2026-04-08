@@ -54,7 +54,7 @@ def db_get_leaderboard():
         return []
 
 # ── GAME STATE ────────────────────────────────────────────────────────────────
-BALL_SPEED   = 0.013
+BALL_SPEED   = 0.008
 GAME_DURATION = 180  # 3 minutos em segundos
 PADDLE_H     = 0.22
 PADDLE_W     = 0.04
