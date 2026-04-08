@@ -139,6 +139,17 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
   background: rgba(0,0,0,0.7);
   border-bottom: 1px solid rgba(0,238,255,0.12);
 }
+#game-timer {
+  font-family:'Share Tech Mono', monospace;
+  font-size:clamp(20px,6vw,28px);
+  font-weight:700;
+  color: var(--gold);
+  text-shadow: 0 0 16px var(--gold);
+  letter-spacing:3px;
+  min-width:70px;
+  text-align:center;
+}
+#game-timer.urgent { color: var(--red); text-shadow: 0 0 20px var(--red); animation: pulse .6s ease-in-out infinite; }
 .score-block { text-align:center; }
 .score-label { font-size:9px; color:#555; letter-spacing:3px; }
 .score-val   { font-size:clamp(28px, 8vw, 40px); font-weight:900; line-height:1; }
@@ -306,6 +317,7 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
       <div class="score-label" id="label0">P1</div>
       <div class="score-val">0</div>
     </div>
+    <div id="game-timer">3:00</div>
     <div class="score-sep">:</div>
     <div class="score-block" id="s1">
       <div class="score-label" id="label1">P2</div>
@@ -541,9 +553,17 @@ socket.on('match_found', data=>{
 
 socket.on('game_state', data=>{
   ballState = data.ball;
-  const prev = myIdx===0 ? myPaddleY : oppPaddleY;
   if(myIdx===0){ oppPaddleY=data.paddle1; }
   else         { oppPaddleY=data.paddle0; }
+  if(data.time_left !== undefined) {
+    const t = data.time_left;
+    const mins = Math.floor(t / 60);
+    const secs = String(t % 60).padStart(2, '0');
+    const timerEl = document.getElementById('game-timer');
+    timerEl.textContent = `${mins}:${secs}`;
+    if(t <= 30) timerEl.classList.add('urgent');
+    else timerEl.classList.remove('urgent');
+  }
 });
 
 socket.on('score_update', data=>{
@@ -594,12 +614,12 @@ function showMath(data) {
     btnsDiv.appendChild(btn);
   });
 
-  mathTimerSec = 8;
+  mathTimerSec = 5;
   document.getElementById('math-timer-bar').style.width='100%';
   clearInterval(mathTimerInterval);
   mathTimerInterval = setInterval(()=>{
     mathTimerSec -= .1;
-    document.getElementById('math-timer-bar').style.width = Math.max(0,(mathTimerSec/8)*100)+'%';
+    document.getElementById('math-timer-bar').style.width = Math.max(0,(mathTimerSec/5)*100)+'%';
     if(mathTimerSec<=0) clearInterval(mathTimerInterval);
   },100);
 
