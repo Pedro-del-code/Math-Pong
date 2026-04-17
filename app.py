@@ -259,10 +259,24 @@ class GameRoom:
         feedback = 'correct' if correct else ('wrong' if chosen_idx != -1 else 'timeout')
         self.math_results[player_idx] = correct
         sid = self.sids[player_idx]
+
+        # Acerto: +1 ponto; Erro/Timeout: -1 ponto (minimo 0)
+        if correct:
+            self.scores[player_idx] += 1
+        else:
+            self.scores[player_idx] = max(0, self.scores[player_idx] - 1)
+
         socketio.emit('math_result', {
             'feedback':    feedback,
             'correct_idx': q['correct_idx'],
         }, to=sid)
+        # Atualiza placar para ambos os jogadores
+        socketio.emit('score_update', {
+            'scores':         self.scores,
+            'scorer':         player_idx if correct else -1,
+            'math_penalty':   not correct,
+            'penalty_player': player_idx if not correct else -1,
+        }, room=self.room_id)
         if all(self.math_answered) and not self._finalizing:
             threading.Thread(target=self._finalize_math, daemon=True).start()
 
@@ -368,57 +382,245 @@ class GameRoom:
         self._finalizing = False
 
     def _gen_question(self):
-        # Level-based difficulty: 6=6ºEF … 12=3ºEM
+        """Gera questões alinhadas ao currículo de cada série."""
         lv = self.level  # 6-12
-        if lv <= 6:
-            a  = random.randint(1, 15)
-            b  = random.randint(1, 15)
-            op = random.choice(['+', '-'])
-        elif lv == 7:
-            a  = random.randint(1, 30)
-            b  = random.randint(1, 20)
-            op = random.choice(['+', '-', '×'])
-        elif lv == 8:
-            a  = random.randint(2, 20)
-            b  = random.randint(2, 10)
-            op = random.choice(['+', '-', '×', '÷'])
-        elif lv == 9:
-            a  = random.randint(5, 50)
-            b  = random.randint(2, 20)
-            op = random.choice(['+', '-', '×', '÷'])
-        elif lv == 10:
-            a  = random.randint(10, 100)
-            b  = random.randint(2, 25)
-            op = random.choice(['+', '-', '×', '÷'])
-        elif lv == 11:
-            a  = random.randint(10, 200)
-            b  = random.randint(5, 30)
-            op = random.choice(['+', '-', '×', '÷'])
-        else:  # 12 = 3ºEM
-            a  = random.randint(20, 500)
-            b  = random.randint(5, 50)
-            op = random.choice(['+', '-', '×', '÷'])
 
-        if op == '+':   answer = a + b
-        elif op == '-': answer = a - b
-        elif op == '×': answer = a * b
-        else:
-            answer = a
-            a = a * b
-            op = '÷'
+        # Cada gerador retorna (text, answer)
+        def q_fracao_simples():
+            # a/b + c/b ou a/b - c/b (mesmo denominador) — 6º/7º EF
+            b = random.choice([2, 3, 4, 5, 6, 8, 10])
+            a = random.randint(1, b * 2)
+            c = random.randint(1, b * 2)
+            if random.random() < 0.5:
+                num = a + c
+                return f'{a}/{b} + {c}/{b} = ?', num, b
+            else:
+                num = a - c
+                return f'{a}/{b} - {c}/{b} = ?', num, b  # pode ser negativo
 
+        def q_fracao_resultado(num, den):
+            """Retorna string de fração simplificada."""
+            import math as _math
+            g = _math.gcd(abs(num), den) if den != 0 else 1
+            n2, d2 = num // g, den // g
+            if d2 == 1:
+                return n2
+            return None  # descartado se não simplifica para inteiro
+
+        def q_potencia():
+            base = random.randint(2, 9)
+            exp  = random.choice([2, 3])
+            return f'{base}² = ?' if exp == 2 else f'{base}³ = ?', base ** exp
+
+        def q_raiz():
+            n = random.choice([4, 9, 16, 25, 36, 49, 64, 81, 100, 121, 144])
+            return f'√{n} = ?', int(n ** 0.5)
+
+        def q_regra_tres():
+            a = random.choice([2, 3, 4, 5, 6, 8, 10])
+            b = a * random.randint(3, 8)
+            c = random.choice([2, 3, 4, 5, 6])
+            ans = (b * c) // a
+            return f'{a} → {b}\n{c} → ?', ans
+
+        def q_porcentagem():
+            perc = random.choice([10, 20, 25, 50])
+            val  = random.choice([20, 40, 60, 80, 100, 120, 150, 200])
+            ans  = (perc * val) // 100
+            return f'{perc}% de {val} = ?', ans
+
+        def q_equacao_1grau():
+            # ax + b = c  →  x = (c-b)/a
+            a = random.randint(2, 9)
+            x = random.randint(1, 15)
+            b = random.randint(0, 20)
+            c = a * x + b
+            return f'{a}x + {b} = {c}  →  x = ?', x
+
+        def q_equacao_produto_nulo():
+            r1 = random.randint(-6, 6)
+            r2 = random.randint(-6, 6)
+            # Pergunta apenas uma das raízes (a maior)
+            ans = max(r1, r2)
+            b   = -(r1 + r2)
+            c   =  r1 * r2
+            bs  = f'+ {b}' if b >= 0 else f'- {abs(b)}'
+            cs  = f'+ {c}' if c >= 0 else f'- {abs(c)}'
+            return f'x² {bs}x {cs} = 0\nMaior raiz = ?', ans
+
+        def q_progressao_aritmetica():
+            a1 = random.randint(1, 10)
+            r  = random.randint(2, 8)
+            n  = random.randint(4, 7)
+            an = a1 + (n - 1) * r
+            return f'PA: {a1}, {a1+r}, {a1+2*r}, ...\n{n}º termo = ?', an
+
+        def q_log():
+            base = random.choice([2, 3, 5, 10])
+            exp  = random.randint(1, 4)
+            val  = base ** exp
+            return f'log_{base}({val}) = ?', exp
+
+        def q_trigonometria():
+            # Ângulos notáveis: seno/cosseno × 2  (resultado inteiro após ×2)
+            pairs = [(30, 'sen', 1), (30, 'cos', 3**0.5), (45, 'sen', 2**0.5),
+                     (45, 'cos', 2**0.5), (60, 'sen', 3**0.5), (60, 'cos', 1)]
+            ang, fn, val_raw = random.choice(pairs)
+            # Pergunta: 2 × sen(ang) ≈ ? (arredondado)
+            ans = round(2 * val_raw / 2)  # simplificado: apenas valores inteiros
+            # Usa apenas ângulos que resultam inteiro
+            int_pairs = [(30,'sen',1),(60,'cos',1)]
+            ang, fn, ans = random.choice(int_pairs)
+            return f'2 · {fn}({ang}°) = ?', ans
+
+        def q_derivada_simples():
+            n   = random.randint(2, 6)
+            a   = random.randint(1, 8)
+            # f(x) = a·xⁿ  →  f'(x) = a·n·x^(n-1)  — pergunta coeficiente de x^(n-1)
+            coef = a * n
+            return f"f(x) = {a}x^{n}  →  f'(coef. de x^{n-1}) = ?", coef
+
+        def q_geometria_area():
+            # Área do triângulo
+            b = random.randint(4, 20)
+            h = random.randint(2, 16)
+            area = (b * h) // 2
+            return f'Triâng.: base={b}, h={h}\nÁrea = ?', area
+
+        def q_mmc():
+            pairs = [(4,6),(6,9),(4,10),(3,5),(6,8),(5,10),(4,12),(6,10)]
+            a, b = random.choice(pairs)
+            import math as _math
+            return f'MMC({a},{b}) = ?', (a*b)//_math.gcd(a,b)
+
+        def q_mdc():
+            pairs = [(12,8),(15,10),(18,12),(20,16),(24,18),(30,20)]
+            a, b = random.choice(pairs)
+            import math as _math
+            return f'MDC({a},{b}) = ?', _math.gcd(a,b)
+
+        # ── Seleciona questão por série ──────────────────────────────────────
+        if lv <= 6:   # 6º EF — inteiros, MMC/MDC, introdução a frações
+            qtype = random.choice(['soma','sub','mult','mmc','mdc','fracao'])
+            if qtype == 'soma':
+                a, b = random.randint(1,50), random.randint(1,50)
+                text, answer = f'{a} + {b} = ?', a + b
+            elif qtype == 'sub':
+                a = random.randint(10, 60); b = random.randint(1, a)
+                text, answer = f'{a} - {b} = ?', a - b
+            elif qtype == 'mult':
+                a, b = random.randint(2,12), random.randint(2,12)
+                text, answer = f'{a} × {b} = ?', a * b
+            elif qtype == 'mmc':
+                text, answer = q_mmc()
+            elif qtype == 'mdc':
+                text, answer = q_mdc()
+            else:
+                # fração mesmo denominador → só se resultado inteiro positivo
+                den = random.choice([2,3,4,5])
+                num_a = random.randint(1, den*2)
+                num_b = random.randint(1, num_a)
+                num_r = num_a - num_b
+                text  = f'{num_a}/{den} - {num_b}/{den} = ?'
+                answer = num_r  # simplificado se den=1 implícito
+
+        elif lv == 7:  # 7º EF — frações, equação 1º grau, porcentagem básica
+            qtype = random.choice(['fracao_soma','fracao_sub','equacao','porcentagem','potencia'])
+            if qtype in ('fracao_soma','fracao_sub'):
+                den = random.choice([3,4,5,6,8,10])
+                na  = random.randint(1, den)
+                nb  = random.randint(1, den)
+                if qtype == 'fracao_soma':
+                    text   = f'{na}/{den} + {nb}/{den} = ?'
+                    answer = na + nb  # numerador; denominador implícito
+                else:
+                    na, nb = max(na,nb), min(na,nb)
+                    text   = f'{na}/{den} - {nb}/{den} = ?'
+                    answer = na - nb
+                # exibe como "X/den" — simplifica para inteiro se possível
+                import math as _math
+                import math as _math2
+                g   = _math.gcd(answer, den)
+                n2, d2 = answer // g, den // g
+                answer = n2 if d2 == 1 else n2  # mostra apenas numerador simplificado
+            elif qtype == 'equacao':
+                text, answer = q_equacao_1grau()
+            elif qtype == 'porcentagem':
+                text, answer = q_porcentagem()
+            else:
+                text, answer = q_potencia()
+
+        elif lv == 8:  # 8º EF — potências, raízes, regra de três, equação
+            qtype = random.choice(['potencia','raiz','regra3','equacao','porcentagem'])
+            if qtype == 'potencia':    text, answer = q_potencia()
+            elif qtype == 'raiz':      text, answer = q_raiz()
+            elif qtype == 'regra3':    text, answer = q_regra_tres()
+            elif qtype == 'equacao':   text, answer = q_equacao_1grau()
+            else:                      text, answer = q_porcentagem()
+
+        elif lv == 9:  # 9º EF — equação 2º grau (produto nulo), PA, área
+            qtype = random.choice(['equacao2','pa','area','raiz','potencia'])
+            if qtype == 'equacao2':  text, answer = q_equacao_produto_nulo()
+            elif qtype == 'pa':      text, answer = q_progressao_aritmetica()
+            elif qtype == 'area':    text, answer = q_geometria_area()
+            elif qtype == 'raiz':    text, answer = q_raiz()
+            else:                    text, answer = q_potencia()
+
+        elif lv == 10:  # 1º EM — equação 2º grau, PA/PG, trigonometria
+            qtype = random.choice(['equacao2','pa','log_basico','trig','area'])
+            if qtype == 'equacao2':    text, answer = q_equacao_produto_nulo()
+            elif qtype == 'pa':        text, answer = q_progressao_aritmetica()
+            elif qtype == 'log_basico':
+                base = random.choice([2,3,10])
+                exp  = random.randint(1,3)
+                val  = base**exp
+                text, answer = f'log_{base}({val}) = ?', exp
+            elif qtype == 'trig':      text, answer = q_trigonometria()
+            else:                      text, answer = q_geometria_area()
+
+        elif lv == 11:  # 2º EM — logaritmos, matrizes/determinantes simples, PA/PG
+            qtype = random.choice(['log','det2x2','pa','equacao2','raiz'])
+            if qtype == 'log':
+                text, answer = q_log()
+            elif qtype == 'det2x2':
+                a,b,c,d = [random.randint(-5,8) for _ in range(4)]
+                det = a*d - b*c
+                text   = f'det|{a} {b} / {c} {d}| = ?'
+                answer = det
+            elif qtype == 'pa':        text, answer = q_progressao_aritmetica()
+            elif qtype == 'equacao2':  text, answer = q_equacao_produto_nulo()
+            else:                      text, answer = q_raiz()
+
+        else:  # 3º EM — derivadas, limites simples, log, geometria
+            qtype = random.choice(['derivada','log','det2x2','pa','trig'])
+            if qtype == 'derivada':    text, answer = q_derivada_simples()
+            elif qtype == 'log':       text, answer = q_log()
+            elif qtype == 'det2x2':
+                a,b,c,d = [random.randint(-6,9) for _ in range(4)]
+                det = a*d - b*c
+                text   = f'det|{a} {b} / {c} {d}| = ?'
+                answer = det
+            elif qtype == 'pa':        text, answer = q_progressao_aritmetica()
+            else:                      text, answer = q_trigonometria()
+
+        # ── Gera alternativas erradas ────────────────────────────────────────
+        answer = int(answer)
         wrongs = set()
-        spread = max(3, abs(answer) // 5 + 1)
-        while len(wrongs) < 3:
+        spread = max(3, abs(answer) // 4 + 2)
+        attempts = 0
+        while len(wrongs) < 3 and attempts < 200:
+            attempts += 1
             delta = random.randint(1, spread)
             w = answer + (delta if random.random() < 0.5 else -delta)
             if w != answer:
                 wrongs.add(w)
+        while len(wrongs) < 3:
+            wrongs.add(answer + len(wrongs) + 1)
 
         choices = list(wrongs) + [answer]
         random.shuffle(choices)
         return {
-            'text':        f'{a} {op} {b} = ?',
+            'text':        text,
             'choices':     choices,
             'correct_idx': choices.index(answer),
         }
