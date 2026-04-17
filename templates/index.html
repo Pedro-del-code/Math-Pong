@@ -907,16 +907,31 @@ socket.on('score_update', data=>{
   scores = data.scores;
   document.querySelector('#s0 .score-val').textContent = scores[0];
   document.querySelector('#s1 .score-val').textContent = scores[1];
-  armSwing = 8;
-  // Animate score flash
-  const scorerEl = document.querySelector(`#s${data.scorer} .score-val`);
-  if (scorerEl) {
-    scorerEl.style.transform = 'scale(1.4)';
-    scorerEl.style.transition = 'transform 0.2s';
-    setTimeout(() => { scorerEl.style.transform = 'scale(1)'; }, 300);
+
+  if (data.math_penalty && data.penalty_player !== undefined && data.penalty_player >= 0) {
+    // Animação de penalidade (-1) no placar do jogador que errou
+    const penEl = document.querySelector(`#s${data.penalty_player} .score-val`);
+    if (penEl) {
+      penEl.style.color = '#ff4466';
+      penEl.style.transform = 'scale(0.8)';
+      penEl.style.transition = 'all 0.2s';
+      const isMe = data.penalty_player === myIdx;
+      showEffectToast(isMe ? '✗ -1 ponto (errou!)' : '✗ Inimigo perdeu 1 ponto!');
+      setTimeout(() => {
+        penEl.style.transform = 'scale(1)';
+        penEl.style.color = data.penalty_player === 0 ? 'var(--cyan)' : 'var(--red)';
+      }, 400);
+    }
+  } else if (data.scorer >= 0) {
+    armSwing = 8;
+    const scorerEl = document.querySelector(`#s${data.scorer} .score-val`);
+    if (scorerEl) {
+      scorerEl.style.transform = 'scale(1.4)';
+      scorerEl.style.transition = 'transform 0.2s';
+      setTimeout(() => { scorerEl.style.transform = 'scale(1)'; }, 300);
+    }
+    showReadyFlash();
   }
-  // Show "get ready" overlay briefly
-  showReadyFlash();
 });
 
 function showReadyFlash() {
@@ -1002,9 +1017,9 @@ function resolvemath(data) {
   const fb   = document.getElementById('math-fb');
   const btns = document.querySelectorAll('.math-btn');
   btns.forEach((b,i)=>{ if(i===data.correct_idx) b.classList.add('correct'); else b.classList.add('wrong'); b.onclick=null; });
-  if(data.feedback==='correct')       { fb.style.color='#00ff80'; fb.textContent='✓ CORRETO!'; }
-  else if(data.feedback==='wrong')    { fb.style.color='#ff4466'; fb.textContent='✗ ERRADO!'; }
-  else                                { fb.style.color='#ffcc00'; fb.textContent='⏱ TEMPO ESGOTADO!'; }
+  if(data.feedback==='correct')       { fb.style.color='#00ff80'; fb.textContent='✓ CORRETO! +1 PONTO'; }
+  else if(data.feedback==='wrong')    { fb.style.color='#ff4466'; fb.textContent='✗ ERRADO! -1 PONTO'; }
+  else                                { fb.style.color='#ffcc00'; fb.textContent='⏱ TEMPO! -1 PONTO'; }
   // Delay closing so roulette can open on top if needed
   setTimeout(hideMathOverlay, 800);
 }
@@ -1258,13 +1273,13 @@ const LEVELS = [
   { id: 12, label: '3º ANO',  sub: 'EM' },
 ];
 const LEVEL_DESC = {
-  6:  'Adição e subtração até 15',
-  7:  'Adição, subtração e multiplicação até 30',
-  8:  'As 4 operações, números até 20',
-  9:  'As 4 operações, números maiores',
-  10: 'Operações com números até 100',
-  11: 'Operações com números até 200',
-  12: 'Operações com números até 500',
+  6:  'MMC, MDC, frações simples, multiplicação',
+  7:  'Frações, equações 1º grau, porcentagem, potências',
+  8:  'Potências, raízes, regra de três, equações',
+  9:  'Equação 2º grau, PA, área de figuras',
+  10: 'Equação 2º grau, PA/PG, trigonometria',
+  11: 'Logaritmos, determinantes, PA/PG',
+  12: 'Derivadas, logaritmos, matrizes, trigonometria',
 };
 
 let selectedLevel = parseInt(localStorage.getItem('mathpong_level') || '7');
