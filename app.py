@@ -187,11 +187,11 @@ class GameRoom:
         self.paddle_scales = [1.0, 1.0]  # reset any paddle effects on point
         socketio.emit('score_update', {
             'scores': self.scores,
-            'scorer': player_idx
+            'scorer': player_idx,
+            'reset_effects': True,
         }, room=self.room_id)
-        # Notify clients to reset paddle sizes
-        socketio.emit('effect_paddle', {'size': 1.0, 'player_idx': 0}, room=self.room_id)
-        socketio.emit('effect_paddle', {'size': 1.0, 'player_idx': 1}, room=self.room_id)
+        # Also reset reverse controls on the clients
+        socketio.emit('effect_reverse', {'player_idx': -1}, room=self.room_id)
         # Brief pause before ball relaunch so players can reposition
         self.ball = {'x': 0.0, 'y': 0.0, 'vx': 0.0, 'vy': 0.0}
         def delayed_reset():
@@ -324,6 +324,8 @@ class GameRoom:
                 socketio.emit('effect_reverse', {'player_idx': -1}, room=self.room_id)
             threading.Thread(target=reset_reverse, daemon=True).start()
         elif effect_id == 'freeze':
+            # Notifica apenas o dono da roleta (winner) sobre o freeze
+            socketio.emit('effect_freeze', {}, room=self.room_id)
             self.math_active = True  # pause ball briefly
             def unfreeze():
                 time.sleep(2)
