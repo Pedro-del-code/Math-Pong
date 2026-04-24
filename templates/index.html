@@ -908,6 +908,13 @@ socket.on('score_update', data=>{
   document.querySelector('#s0 .score-val').textContent = scores[0];
   document.querySelector('#s1 .score-val').textContent = scores[1];
 
+  if (data.reset_effects) {
+    // Ponto marcado: reseta todos os efeitos visuais no cliente
+    reverseControls = false;
+    paddleScaleP0 = 1.0;
+    paddleScaleP1 = 1.0;
+  }
+
   if (data.math_penalty && data.penalty_player !== undefined && data.penalty_player >= 0) {
     // Animação de penalidade (-1) no placar do jogador que errou
     const penEl = document.querySelector(`#s${data.penalty_player} .score-val`);
@@ -1124,18 +1131,24 @@ socket.on('effect_paddle', data => {
     const isMe = data.player_idx === myIdx;
     showEffectToast(isMe
       ? (data.size > 1 ? '🏓 Sua raquete ficou gigante!' : '🔬 Sua raquete encolheu!')
-      : (data.size > 1 ? '😱 Raquete do inimigo cresceu!' : '😈 Raquete do inimigo encolheu!')
+      : (data.size > 1 ? '😱 Raquete do inimigo cresceu!' : '😈 Raquete do inimigo encolheu!'),
+      6000
     );
   }
 });
 
 socket.on('effect_reverse', data => {
-  reverseControls = (data.player_idx === myIdx);
-  if (reverseControls) showEffectToast('🔄 Controles invertidos!');
-  else showEffectToast('');
+  const wasActive = reverseControls;
+  // player_idx === -1 significa reset (ninguém com controles invertidos)
+  reverseControls = (data.player_idx !== -1 && data.player_idx === myIdx);
+  if (reverseControls && !wasActive) {
+    showEffectToast('🔄 Controles invertidos por 5s!', 5000);
+  } else if (!reverseControls && wasActive) {
+    showEffectToast('✅ Controles normalizados!', 2000);
+  }
 });
 
-function showEffectToast(msg) {
+function showEffectToast(msg, durationMs = 4000) {
   let toast = document.getElementById('effect-toast');
   if (!toast) {
     toast = document.createElement('div');
@@ -1144,20 +1157,49 @@ function showEffectToast(msg) {
       position:fixed; bottom:130px; left:50%; transform:translateX(-50%);
       font-family:'Orbitron',sans-serif; font-size:12px; font-weight:700;
       letter-spacing:2px; color:var(--gold); text-shadow:0 0 16px var(--gold);
-      background:rgba(0,0,0,0.85); border:1px solid rgba(255,204,0,0.3);
+      background:rgba(0,0,0,0.88); border:1px solid rgba(255,204,0,0.3);
       padding:8px 20px; border-radius:20px; z-index:90;
       pointer-events:none; white-space:nowrap;
       transition: opacity .4s;
     `;
     document.body.appendChild(toast);
   }
+  // Barra de duração
+  let bar = document.getElementById('effect-toast-bar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'effect-toast-bar';
+    bar.style.cssText = `
+      position:absolute; bottom:0; left:0; height:2px;
+      background:var(--gold); border-radius:0 0 20px 20px;
+      transition: width linear; width:100%;
+    `;
+    toast.style.position = 'fixed';
+    toast.style.overflow = 'hidden';
+    toast.appendChild(bar);
+  }
   toast.textContent = msg;
+  toast.appendChild(bar);
   toast.style.opacity = '1';
   clearTimeout(toast._timeout);
-  if (msg) {
-    toast._timeout = setTimeout(() => { toast.style.opacity = '0'; }, 4000);
-  }
+  clearTimeout(toast._barTimeout);
+
+  // Anima barra de duração
+  bar.style.transition = 'none';
+  bar.style.width = '100%';
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      bar.style.transition = `width ${durationMs}ms linear`;
+      bar.style.width = '0%';
+    });
+  });
+
+  toast._timeout = setTimeout(() => { toast.style.opacity = '0'; }, durationMs);
 }
+
+socket.on('effect_freeze', () => {
+  showEffectToast('🧊 Bola congelada por 2s!', 2000);
+});
 
 // reverseControls já integrado no movePaddle original
 
@@ -1253,8 +1295,6 @@ function showRoulette(data) {
         setTimeout(() => {
           overlay.classList.remove('show');
           result.classList.remove('show');
-          // Reset paddle scales on new round
-          if (data.effect.id === 'freeze') showEffectToast('🧊 Bola congelada por 2s!');
         }, 1200);
       }, 3100);
     });
