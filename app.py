@@ -219,6 +219,31 @@ class GameRoom:
             'leaderboard':  leaderboard,
         }, room=self.room_id)
 
+    # Tempo (segundos) por tipo de questão
+    QUESTION_TIME = {
+        'soma':         5,
+        'sub':          5,
+        'mult':         6,
+        'mmc':          8,
+        'mdc':          8,
+        'fracao':       9,
+        'fracao_soma':  9,
+        'fracao_sub':   9,
+        'potencia':     6,
+        'raiz':         6,
+        'porcentagem':  8,
+        'regra3':       10,
+        'equacao':      12,
+        'equacao2':     15,
+        'pa':           14,
+        'area':         10,
+        'log_basico':   10,
+        'log':          12,
+        'trig':         10,
+        'det2x2':       12,
+        'derivada':     13,
+    }
+
     def _trigger_math(self, player_idx):
         if self.math_active:
             return
@@ -237,15 +262,17 @@ class GameRoom:
                 'for_me':     True,
                 'question':   q['text'],
                 'choices':    q['choices'],
+                'time_limit': q['time_limit'],
             }, to=sid)
 
         self._finalizing = False
+        # Usa o maior tempo entre os dois jogadores como timeout do servidor
+        max_time = max(q0['time_limit'], q1['time_limit'])
         def timeout():
-            time.sleep(5)
+            time.sleep(max_time)
             for i in range(2):
                 if not self.math_answered[i]:
                     self._resolve_player_math(i, -1)
-            # Only finalize if not already being finalized by answer
             if not self._finalizing:
                 self._finalize_math()
         threading.Thread(target=timeout, daemon=True).start()
@@ -293,52 +320,71 @@ class GameRoom:
     def _roll_effect(self):
         return random.choice(self.WINNER_EFFECTS)
 
+    def _relaunch_ball_with_speed(self):
+        """Relança a bola com speed_mult atual em direção aleatória."""
+        direction = random.choice([1, -1])
+        angle = (random.random() * 0.5 + 0.2) * random.choice([1, -1])
+        s = BALL_SPEED * self.speed_mult
+        self.ball = {
+            'x': 0.0, 'y': 0.0,
+            'vx': s * direction,
+            'vy': angle * s,
+        }
+
     def _apply_effect(self, effect_id, winner_idx):
         loser_idx = 1 - winner_idx
-        b = self.ball
 
         if effect_id == 'slow':
-            self.speed_mult = max(0.4, self.speed_mult * 0.7)
+            self.speed_mult = max(0.4, self.speed_mult * 0.65)
+            # Bola estava parada durante math — relança com nova velocidade
+            self._relaunch_ball_with_speed()
+
         elif effect_id == 'fast_opp':
-            self.speed_mult = min(2.0, self.speed_mult * 1.3)
+            self.speed_mult = min(2.2, self.speed_mult * 1.4)
+            # Relança bola indo em direção ao perdedor (pressão)
+            direction = 1 if loser_idx == 1 else -1
+            angle = (random.random() * 0.5 + 0.2) * random.choice([1, -1])
+            s = BALL_SPEED * self.speed_mult
+            self.ball = {'x': 0.0, 'y': 0.0, 'vx': s * direction, 'vy': angle * s}
+
         elif effect_id == 'big_paddle':
             self.paddle_scales[winner_idx] = 1.7
             socketio.emit('effect_paddle', {'size': 1.7, 'player_idx': winner_idx}, room=self.room_id)
+            wi = winner_idx  # captura por valor para o closure
             def reset_paddle():
-                time.sleep(6)
-                self.paddle_scales[winner_idx] = 1.0
-                socketio.emit('effect_paddle', {'size': 1.0, 'player_idx': winner_idx}, room=self.room_id)
+                time.sleep(8)
+                self.paddle_scales[wi] = 1.0
+                socketio.emit('effect_paddle', {'size': 1.0, 'player_idx': wi}, room=self.room_id)
             threading.Thread(target=reset_paddle, daemon=True).start()
+            self._relaunch_ball_with_speed()
+
         elif effect_id == 'tiny_opp':
-            self.paddle_scales[loser_idx] = 0.45
-            socketio.emit('effect_paddle', {'size': 0.45, 'player_idx': loser_idx}, room=self.room_id)
+            self.paddle_scales[loser_idx] = 0.4
+            socketio.emit('effect_paddle', {'size': 0.4, 'player_idx': loser_idx}, room=self.room_id)
+            li = loser_idx
             def reset_opp():
-                time.sleep(6)
-                self.paddle_scales[loser_idx] = 1.0
-                socketio.emit('effect_paddle', {'size': 1.0, 'player_idx': loser_idx}, room=self.room_id)
+                time.sleep(8)
+                self.paddle_scales[li] = 1.0
+                socketio.emit('effect_paddle', {'size': 1.0, 'player_idx': li}, room=self.room_id)
             threading.Thread(target=reset_opp, daemon=True).start()
+            self._relaunch_ball_with_speed()
+
         elif effect_id == 'reverse':
             socketio.emit('effect_reverse', {'player_idx': loser_idx}, room=self.room_id)
             def reset_reverse():
-                time.sleep(5)
+                time.sleep(6)
                 socketio.emit('effect_reverse', {'player_idx': -1}, room=self.room_id)
             threading.Thread(target=reset_reverse, daemon=True).start()
+            self._relaunch_ball_with_speed()
+
         elif effect_id == 'freeze':
-            # Notifica apenas o dono da roleta (winner) sobre o freeze
             socketio.emit('effect_freeze', {}, room=self.room_id)
-            self.math_active = True  # pause ball briefly
+            self.math_active = True  # pausa a bola por 2s
             def unfreeze():
                 time.sleep(2)
+                self._relaunch_ball_with_speed()
                 self.math_active = False
             threading.Thread(target=unfreeze, daemon=True).start()
-
-        # Adjust ball speed after effect
-        spd = math.sqrt(b['vx']**2 + b['vy']**2)
-        new_spd = BALL_SPEED * self.speed_mult
-        if spd > 0 and effect_id not in ('big_paddle', 'tiny_opp', 'reverse', 'freeze'):
-            ratio = new_spd / spd
-            b['vx'] *= ratio
-            b['vy'] *= ratio
 
     def _finalize_math(self):
         if not self.math_active:
@@ -364,23 +410,18 @@ class GameRoom:
                 'effect': effect,
                 'all_effects': [e['label'] for e in self.WINNER_EFFECTS],
             }, room=self.room_id)
-            time.sleep(4.2)  # wait for full roulette animation + buffer
+            time.sleep(4.5)  # wait for full roulette animation + buffer
+            # Libera math_active ANTES de aplicar efeito (freeze vai re-setar sozinho)
+            self.math_active = False
             self._apply_effect(effect['id'], winner_idx)
         else:
             if r[0] is True and r[1] is True:
                 self.speed_mult = max(0.6, self.speed_mult * 0.9)
             elif r[0] is False and r[1] is False:
                 self.speed_mult = min(1.5, self.speed_mult * 1.1)
-            # reapply speed to ball
-            b = self.ball
-            spd = math.sqrt(b['vx']**2 + b['vy']**2)
-            new_spd = BALL_SPEED * self.speed_mult
-            if spd > 0:
-                ratio = new_spd / spd
-                b['vx'] *= ratio
-                b['vy'] *= ratio
+            self._relaunch_ball_with_speed()
+            self.math_active = False
 
-        self.math_active = False
         self._finalizing = False
 
     def _gen_question(self):
@@ -389,7 +430,6 @@ class GameRoom:
 
         # Cada gerador retorna (text, answer)
         def q_fracao_simples():
-            # a/b + c/b ou a/b - c/b (mesmo denominador) — 6º/7º EF
             b = random.choice([2, 3, 4, 5, 6, 8, 10])
             a = random.randint(1, b * 2)
             c = random.randint(1, b * 2)
@@ -398,16 +438,15 @@ class GameRoom:
                 return f'{a}/{b} + {c}/{b} = ?', num, b
             else:
                 num = a - c
-                return f'{a}/{b} - {c}/{b} = ?', num, b  # pode ser negativo
+                return f'{a}/{b} - {c}/{b} = ?', num, b
 
         def q_fracao_resultado(num, den):
-            """Retorna string de fração simplificada."""
             import math as _math
             g = _math.gcd(abs(num), den) if den != 0 else 1
             n2, d2 = num // g, den // g
             if d2 == 1:
                 return n2
-            return None  # descartado se não simplifica para inteiro
+            return None
 
         def q_potencia():
             base = random.randint(2, 9)
@@ -432,7 +471,6 @@ class GameRoom:
             return f'{perc}% de {val} = ?', ans
 
         def q_equacao_1grau():
-            # ax + b = c  →  x = (c-b)/a
             a = random.randint(2, 9)
             x = random.randint(1, 15)
             b = random.randint(0, 20)
@@ -442,7 +480,6 @@ class GameRoom:
         def q_equacao_produto_nulo():
             r1 = random.randint(-6, 6)
             r2 = random.randint(-6, 6)
-            # Pergunta apenas uma das raízes (a maior)
             ans = max(r1, r2)
             b   = -(r1 + r2)
             c   =  r1 * r2
@@ -464,13 +501,6 @@ class GameRoom:
             return f'log_{base}({val}) = ?', exp
 
         def q_trigonometria():
-            # Ângulos notáveis: seno/cosseno × 2  (resultado inteiro após ×2)
-            pairs = [(30, 'sen', 1), (30, 'cos', 3**0.5), (45, 'sen', 2**0.5),
-                     (45, 'cos', 2**0.5), (60, 'sen', 3**0.5), (60, 'cos', 1)]
-            ang, fn, val_raw = random.choice(pairs)
-            # Pergunta: 2 × sen(ang) ≈ ? (arredondado)
-            ans = round(2 * val_raw / 2)  # simplificado: apenas valores inteiros
-            # Usa apenas ângulos que resultam inteiro
             int_pairs = [(30,'sen',1),(60,'cos',1)]
             ang, fn, ans = random.choice(int_pairs)
             return f'2 · {fn}({ang}°) = ?', ans
@@ -478,12 +508,10 @@ class GameRoom:
         def q_derivada_simples():
             n   = random.randint(2, 6)
             a   = random.randint(1, 8)
-            # f(x) = a·xⁿ  →  f'(x) = a·n·x^(n-1)  — pergunta coeficiente de x^(n-1)
             coef = a * n
             return f"f(x) = {a}x^{n}  →  f'(coef. de x^{n-1}) = ?", coef
 
         def q_geometria_area():
-            # Área do triângulo
             b = random.randint(4, 20)
             h = random.randint(2, 16)
             area = (b * h) // 2
@@ -501,8 +529,11 @@ class GameRoom:
             import math as _math
             return f'MDC({a},{b}) = ?', _math.gcd(a,b)
 
-        # ── Seleciona questão por série ──────────────────────────────────────
-        if lv <= 6:   # 6º EF — inteiros, MMC/MDC, introdução a frações
+        # ── Seleciona questão por série, rastreando qtype ────────────────────
+        qtype = None
+        text = answer = None
+
+        if lv <= 6:
             qtype = random.choice(['soma','sub','mult','mmc','mdc','fracao'])
             if qtype == 'soma':
                 a, b = random.randint(1,50), random.randint(1,50)
@@ -518,15 +549,15 @@ class GameRoom:
             elif qtype == 'mdc':
                 text, answer = q_mdc()
             else:
-                # fração mesmo denominador → só se resultado inteiro positivo
+                qtype = 'fracao'
                 den = random.choice([2,3,4,5])
                 num_a = random.randint(1, den*2)
                 num_b = random.randint(1, num_a)
                 num_r = num_a - num_b
                 text  = f'{num_a}/{den} - {num_b}/{den} = ?'
-                answer = num_r  # simplificado se den=1 implícito
+                answer = num_r
 
-        elif lv == 7:  # 7º EF — frações, equação 1º grau, porcentagem básica
+        elif lv == 7:
             qtype = random.choice(['fracao_soma','fracao_sub','equacao','porcentagem','potencia'])
             if qtype in ('fracao_soma','fracao_sub'):
                 den = random.choice([3,4,5,6,8,10])
@@ -534,17 +565,15 @@ class GameRoom:
                 nb  = random.randint(1, den)
                 if qtype == 'fracao_soma':
                     text   = f'{na}/{den} + {nb}/{den} = ?'
-                    answer = na + nb  # numerador; denominador implícito
+                    answer = na + nb
                 else:
                     na, nb = max(na,nb), min(na,nb)
                     text   = f'{na}/{den} - {nb}/{den} = ?'
                     answer = na - nb
-                # exibe como "X/den" — simplifica para inteiro se possível
                 import math as _math
-                import math as _math2
-                g   = _math.gcd(answer, den)
+                g   = _math.gcd(abs(answer), den)
                 n2, d2 = answer // g, den // g
-                answer = n2 if d2 == 1 else n2  # mostra apenas numerador simplificado
+                answer = n2 if d2 == 1 else n2
             elif qtype == 'equacao':
                 text, answer = q_equacao_1grau()
             elif qtype == 'porcentagem':
@@ -552,7 +581,7 @@ class GameRoom:
             else:
                 text, answer = q_potencia()
 
-        elif lv == 8:  # 8º EF — potências, raízes, regra de três, equação
+        elif lv == 8:
             qtype = random.choice(['potencia','raiz','regra3','equacao','porcentagem'])
             if qtype == 'potencia':    text, answer = q_potencia()
             elif qtype == 'raiz':      text, answer = q_raiz()
@@ -560,7 +589,7 @@ class GameRoom:
             elif qtype == 'equacao':   text, answer = q_equacao_1grau()
             else:                      text, answer = q_porcentagem()
 
-        elif lv == 9:  # 9º EF — equação 2º grau (produto nulo), PA, área
+        elif lv == 9:
             qtype = random.choice(['equacao2','pa','area','raiz','potencia'])
             if qtype == 'equacao2':  text, answer = q_equacao_produto_nulo()
             elif qtype == 'pa':      text, answer = q_progressao_aritmetica()
@@ -568,7 +597,7 @@ class GameRoom:
             elif qtype == 'raiz':    text, answer = q_raiz()
             else:                    text, answer = q_potencia()
 
-        elif lv == 10:  # 1º EM — equação 2º grau, PA/PG, trigonometria
+        elif lv == 10:
             qtype = random.choice(['equacao2','pa','log_basico','trig','area'])
             if qtype == 'equacao2':    text, answer = q_equacao_produto_nulo()
             elif qtype == 'pa':        text, answer = q_progressao_aritmetica()
@@ -580,7 +609,7 @@ class GameRoom:
             elif qtype == 'trig':      text, answer = q_trigonometria()
             else:                      text, answer = q_geometria_area()
 
-        elif lv == 11:  # 2º EM — logaritmos, matrizes/determinantes simples, PA/PG
+        elif lv == 11:
             qtype = random.choice(['log','det2x2','pa','equacao2','raiz'])
             if qtype == 'log':
                 text, answer = q_log()
@@ -593,7 +622,7 @@ class GameRoom:
             elif qtype == 'equacao2':  text, answer = q_equacao_produto_nulo()
             else:                      text, answer = q_raiz()
 
-        else:  # 3º EM — derivadas, limites simples, log, geometria
+        else:  # lv == 12
             qtype = random.choice(['derivada','log','det2x2','pa','trig'])
             if qtype == 'derivada':    text, answer = q_derivada_simples()
             elif qtype == 'log':       text, answer = q_log()
@@ -604,6 +633,9 @@ class GameRoom:
                 answer = det
             elif qtype == 'pa':        text, answer = q_progressao_aritmetica()
             else:                      text, answer = q_trigonometria()
+
+        # tempo baseado no tipo real sorteado
+        time_limit = self.QUESTION_TIME.get(qtype, 8)
 
         # ── Gera alternativas erradas ────────────────────────────────────────
         answer = int(answer)
@@ -625,6 +657,7 @@ class GameRoom:
             'text':        text,
             'choices':     choices,
             'correct_idx': choices.index(answer),
+            'time_limit':  time_limit,
         }
 
     def _state(self):
