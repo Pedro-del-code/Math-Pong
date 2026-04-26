@@ -926,8 +926,46 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
   transition: width linear;
 }
 
-/* ── COMO JOGAR MODAL ── */
-#screen-howto {
+/* ── SKIN SELECTOR ── */
+#screen-skins {
+  background: rgba(0,2,8,0.97);
+  z-index:500;
+  overflow-y: auto;
+  padding: 24px 16px;
+}
+.skin-section { width: min(380px,92vw); margin-bottom:22px; }
+.skin-section-title {
+  font-size:9px; letter-spacing:5px; color:var(--cyan);
+  border-bottom:1px solid rgba(0,238,255,0.15);
+  padding-bottom:6px; margin-bottom:12px;
+  font-family:'Share Tech Mono',monospace;
+}
+.skin-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+.skin-btn {
+  display:flex; flex-direction:column; align-items:center; gap:6px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius:10px;
+  padding:12px 6px 8px;
+  cursor:pointer;
+  transition: all .2s;
+  font-family:'Share Tech Mono',monospace;
+  font-size:8px; letter-spacing:1px; color:#555;
+}
+.skin-btn canvas { display:block; }
+.skin-btn:hover { border-color:rgba(0,238,255,0.3); background:rgba(0,238,255,0.04); }
+.skin-btn.selected {
+  border-color:var(--cyan);
+  background:rgba(0,238,255,0.08);
+  color:var(--cyan);
+  box-shadow:0 0 16px rgba(0,238,255,0.2);
+}
+.skin-btn.selected-red {
+  border-color:var(--red);
+  background:rgba(255,68,102,0.08);
+  color:var(--red);
+  box-shadow:0 0 16px rgba(255,68,102,0.2);
+}
   background: rgba(0,2,8,0.98);
   z-index:500;
   overflow-y: auto;
@@ -1131,6 +1169,7 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
       <button class="btn-secondary" onclick="showHowto()" style="flex:1;padding:12px;font-size:11px;letter-spacing:2px;">❓ REGRAS</button>
       <button class="btn-secondary" onclick="showLeaderboard()" style="flex:1;padding:12px;font-size:11px;letter-spacing:2px;">🏆 RANKING</button>
     </div>
+    <button class="btn-secondary" onclick="showSkins()" style="width:100%;margin-top:4px;padding:12px;font-size:11px;letter-spacing:2px;border-color:rgba(200,100,255,0.5);color:#cc88ff;position:relative;z-index:1;">🎨 SKINS</button>
   </div>
 </div>
 
@@ -1481,12 +1520,16 @@ function gx(v) { return cx + v * cx * 0.88; }
 function gy(v) { return cy + v * cy * 0.88; }
 function gs(v) { return v * Math.min(W, H) * 0.88 * 0.5; }
 
+// ══ SKIN SYSTEM ══════════════════════════════════════════════════════════════
+// Skins de raquete: 'pencil' (kit inicial), 'classic', 'sword', 'wand'
+// Skins de bola: 'xmark' (kit inicial), 'circle', 'star', 'diamond'
+let selectedPaddleSkin = localStorage.getItem('mathpong_paddle_skin') || 'pencil';
+let selectedBallSkin   = localStorage.getItem('mathpong_ball_skin')   || 'xmark';
+
 function drawPaddleRect(px, py, isP1) {
-  // Apply size effect (big_paddle / tiny_opp)
   const playerIdx = isP1 ? 0 : 1;
   const scale = playerIdx === 0 ? paddleScaleP0 : paddleScaleP1;
   const hitF  = paddleHitFlash[playerIdx];
-
   const color = isP1 ? '#00eeff' : '#ff4466';
   const sw = gs(PADDLE_W * 2);
   const sh = gs(PADDLE_H * 2) * scale;
@@ -1495,38 +1538,137 @@ function drawPaddleRect(px, py, isP1) {
   const r  = sw * 0.35;
 
   ctx.save();
-  // Outer glow — intensified on hit
   ctx.shadowColor = color;
   ctx.shadowBlur  = hitF > 0 ? 56 : 28;
 
-  // Gradient paddle
-  const grad = ctx.createLinearGradient(sx, sy, sx + sw, sy + sh);
-  if (hitF > 0) {
-    // Flash white on hit
-    grad.addColorStop(0, '#fff');
-    grad.addColorStop(0.5, color);
-    grad.addColorStop(1, '#fff');
+  const skin = selectedPaddleSkin;
+
+  if (skin === 'pencil') {
+    // ── Lápis (kit inicial) ──────────────────────────────────────────────
+    const bodyColor = hitF > 0 ? '#fff' : color;
+    const tipH = sh * 0.15;
+    const eraserH = sh * 0.1;
+
+    // Corpo do lápis (retângulo arredondado no topo)
+    const grad = ctx.createLinearGradient(sx, sy, sx + sw, sy);
+    grad.addColorStop(0, bodyColor);
+    grad.addColorStop(0.5, isP1 ? 'rgba(0,238,255,0.6)' : 'rgba(255,68,102,0.6)');
+    grad.addColorStop(1, bodyColor);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.roundRect(sx, sy + eraserH, sw, sh - eraserH - tipH, r * 0.2);
+    ctx.fill();
+
+    // Borracha (topo)
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = isP1 ? 'rgba(0,238,255,0.4)' : 'rgba(255,68,102,0.4)';
+    ctx.beginPath();
+    ctx.roundRect(sx + sw*0.1, sy, sw*0.8, eraserH + r*0.2, r*0.3);
+    ctx.fill();
+
+    // Ponta (triângulo na base)
+    ctx.fillStyle = 'rgba(255,220,120,0.9)';
+    ctx.beginPath();
+    ctx.moveTo(sx + sw*0.5, sy + sh); // ponta
+    ctx.lineTo(sx + sw*0.05, sy + sh - tipH);
+    ctx.lineTo(sx + sw*0.95, sy + sh - tipH);
+    ctx.closePath();
+    ctx.fill();
+
+    // Linha de madeira na ponta
+    ctx.fillStyle = 'rgba(180,120,60,0.7)';
+    ctx.beginPath();
+    ctx.roundRect(sx + sw*0.1, sy + sh - tipH, sw*0.8, tipH*0.25, 1);
+    ctx.fill();
+
+    // Linha central decorativa
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = isP1 ? 'rgba(0,238,255,0.3)' : 'rgba(255,68,102,0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(sx + sw*0.5, sy + eraserH);
+    ctx.lineTo(sx + sw*0.5, sy + sh - tipH);
+    ctx.stroke();
+
+  } else if (skin === 'sword') {
+    // ── Espada ────────────────────────────────────────────────────────────
+    const bodyColor = hitF > 0 ? '#fff' : color;
+    // Lâmina
+    const bladeGrad = ctx.createLinearGradient(sx, sy, sx + sw, sy);
+    bladeGrad.addColorStop(0, 'rgba(200,220,255,0.3)');
+    bladeGrad.addColorStop(0.4, bodyColor);
+    bladeGrad.addColorStop(0.6, '#fff');
+    bladeGrad.addColorStop(1, 'rgba(200,220,255,0.3)');
+    ctx.fillStyle = bladeGrad;
+    ctx.beginPath();
+    ctx.moveTo(sx + sw*0.5, sy);          // ponta
+    ctx.lineTo(sx + sw*0.3, sy + sh*0.85);
+    ctx.lineTo(sx + sw*0.7, sy + sh*0.85);
+    ctx.closePath();
+    ctx.fill();
+    // Guarda
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = isP1 ? 'rgba(0,238,255,0.8)' : 'rgba(255,68,102,0.8)';
+    ctx.beginPath();
+    ctx.roundRect(sx + sw*0.05, sy + sh*0.82, sw*0.9, sh*0.06, 2);
+    ctx.fill();
+    // Punho
+    ctx.fillStyle = 'rgba(120,80,40,0.9)';
+    ctx.beginPath();
+    ctx.roundRect(sx + sw*0.35, sy + sh*0.88, sw*0.3, sh*0.12, 3);
+    ctx.fill();
+
+  } else if (skin === 'wand') {
+    // ── Varinha mágica ────────────────────────────────────────────────────
+    const bodyColor = hitF > 0 ? '#fff' : color;
+    // Cabo
+    const wandGrad = ctx.createLinearGradient(sx, sy, sx+sw, sy);
+    wandGrad.addColorStop(0, 'rgba(80,40,20,0.9)');
+    wandGrad.addColorStop(0.5, bodyColor);
+    wandGrad.addColorStop(1, 'rgba(80,40,20,0.9)');
+    ctx.fillStyle = wandGrad;
+    ctx.beginPath();
+    ctx.roundRect(sx + sw*0.35, sy + sh*0.15, sw*0.3, sh*0.85, r*0.1);
+    ctx.fill();
+    // Estrela na ponta
+    ctx.shadowBlur = hitF > 0 ? 30 : 18;
+    ctx.fillStyle = hitF > 0 ? '#fff' : (isP1 ? '#00ffcc' : '#ffcc00');
+    const cx2 = sx + sw*0.5, cy2 = sy + sh*0.1, rs = sw*0.45;
+    ctx.beginPath();
+    for(let i=0;i<5;i++){
+      const a = (i*4*Math.PI/5) - Math.PI/2;
+      const a2 = ((i*4+2)*Math.PI/5) - Math.PI/2;
+      if(i===0) ctx.moveTo(cx2+Math.cos(a)*rs, cy2+Math.sin(a)*rs);
+      else ctx.lineTo(cx2+Math.cos(a)*rs, cy2+Math.sin(a)*rs);
+      ctx.lineTo(cx2+Math.cos(a2)*rs*0.4, cy2+Math.sin(a2)*rs*0.4);
+    }
+    ctx.closePath();
+    ctx.fill();
+
   } else {
-    grad.addColorStop(0, color);
-    grad.addColorStop(0.5, isP1 ? 'rgba(0,238,255,0.7)' : 'rgba(255,68,102,0.7)');
-    grad.addColorStop(1, color);
+    // ── Classic (padrão anterior) ─────────────────────────────────────────
+    const grad = ctx.createLinearGradient(sx, sy, sx + sw, sy + sh);
+    if (hitF > 0) {
+      grad.addColorStop(0, '#fff');
+      grad.addColorStop(0.5, color);
+      grad.addColorStop(1, '#fff');
+    } else {
+      grad.addColorStop(0, color);
+      grad.addColorStop(0.5, isP1 ? 'rgba(0,238,255,0.7)' : 'rgba(255,68,102,0.7)');
+      grad.addColorStop(1, color);
+    }
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.roundRect(sx, sy, sw, sh, r);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = isP1 ? 'rgba(180,255,255,0.2)' : 'rgba(255,180,190,0.2)';
+    ctx.beginPath();
+    ctx.roundRect(sx + sw*0.15, sy + sh*0.05, sw*0.3, sh*0.9, r*0.5);
+    ctx.fill();
   }
 
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.roundRect(sx, sy, sw, sh, r);
-  ctx.fill();
-
-  // Inner highlight
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = isP1 ? 'rgba(180,255,255,0.2)' : 'rgba(255,180,190,0.2)';
-  ctx.beginPath();
-  ctx.roundRect(sx + sw*0.15, sy + sh*0.05, sw*0.3, sh*0.9, r*0.5);
-  ctx.fill();
-
-  // Decay hit flash
   if (paddleHitFlash[playerIdx] > 0) paddleHitFlash[playerIdx] -= 0.12;
-
   ctx.restore();
 }
 
@@ -1555,24 +1697,92 @@ function drawBallRect(bx, by) {
   ballTrail.push({x: bx, y: by});
   if (ballTrail.length > 10) ballTrail.shift();
 
-  const size = r * 2.8; // X symbol, nice and big
+  const size = r * 2.8;
   ctx.save();
-  // Purple glow matching the X color
-  ctx.shadowColor = '#9b8fe8';
-  ctx.shadowBlur  = 32;
-  if (ballImg.complete && ballImg.naturalWidth > 0) {
-    ctx.translate(sx, sy);
-    // Slight wobble for liveliness
-    const wobble = Math.sin(Date.now() * 0.004) * 0.08;
-    ctx.rotate(wobble);
-    ctx.drawImage(ballImg, -size/2, -size/2, size, size);
-  } else {
-    // Fallback: white circle
-    ctx.fillStyle = '#fff';
+
+  const skin = selectedBallSkin;
+  const wobble = Math.sin(Date.now() * 0.004) * 0.08;
+  ctx.translate(sx, sy);
+  ctx.rotate(wobble);
+
+  if (skin === 'xmark') {
+    // ── X mark vetorial (kit inicial, sem fundo) ──────────────────────────
+    ctx.shadowColor = '#9b8fe8';
+    ctx.shadowBlur  = 32;
+    const hw = size * 0.38;
+    const lw = size * 0.18;
+    ctx.strokeStyle = '#c4b5fd';
+    ctx.lineWidth = lw;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    // Brilho interno
+    ctx.shadowColor = '#fff';
+    ctx.shadowBlur = 8;
+    // Linha diagonal \
     ctx.beginPath();
-    ctx.arc(sx, sy, r * 0.5, 0, Math.PI * 2);
+    ctx.moveTo(-hw, -hw);
+    ctx.lineTo(hw, hw);
+    ctx.stroke();
+    // Linha diagonal /
+    ctx.shadowColor = '#9b8fe8';
+    ctx.shadowBlur = 28;
+    ctx.beginPath();
+    ctx.moveTo(hw, -hw);
+    ctx.lineTo(-hw, hw);
+    ctx.stroke();
+
+  } else if (skin === 'circle') {
+    // ── Círculo brilhante ─────────────────────────────────────────────────
+    ctx.shadowColor = '#00eeff';
+    ctx.shadowBlur  = 28;
+    const grad = ctx.createRadialGradient(-size*0.15, -size*0.15, size*0.05, 0, 0, size*0.5);
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(0.4, '#00eeff');
+    grad.addColorStop(1, '#0044aa');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(0, 0, size*0.5, 0, Math.PI*2);
     ctx.fill();
+
+  } else if (skin === 'star') {
+    // ── Estrela ───────────────────────────────────────────────────────────
+    ctx.shadowColor = '#ffcc00';
+    ctx.shadowBlur  = 30;
+    ctx.fillStyle = '#ffdd33';
+    const rs = size*0.52, ri = size*0.22;
+    ctx.beginPath();
+    for(let i=0;i<5;i++){
+      const a = (i*4*Math.PI/5) - Math.PI/2;
+      const a2 = ((i*4+2)*Math.PI/5) - Math.PI/2;
+      if(i===0) ctx.moveTo(Math.cos(a)*rs, Math.sin(a)*rs);
+      else ctx.lineTo(Math.cos(a)*rs, Math.sin(a)*rs);
+      ctx.lineTo(Math.cos(a2)*ri, Math.sin(a2)*ri);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+  } else if (skin === 'diamond') {
+    // ── Diamante ──────────────────────────────────────────────────────────
+    ctx.shadowColor = '#ff4466';
+    ctx.shadowBlur  = 28;
+    const dg = ctx.createLinearGradient(-size*0.5, 0, size*0.5, 0);
+    dg.addColorStop(0, '#ff4466');
+    dg.addColorStop(0.5, '#ffaacc');
+    dg.addColorStop(1, '#ff4466');
+    ctx.fillStyle = dg;
+    const hw2 = size*0.5, hh2 = size*0.5;
+    ctx.beginPath();
+    ctx.moveTo(0, -hh2);
+    ctx.lineTo(hw2, 0);
+    ctx.lineTo(0, hh2);
+    ctx.lineTo(-hw2, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
   }
+
   ctx.restore();
 }
 
@@ -2976,6 +3186,170 @@ function closeHowto() {
   startMenuPreview();
 }
 
+// ══ SKINS ═════════════════════════════════════════════════════════════════════
+const BALL_SKINS = [
+  { id:'xmark',   label:'X MARK',  draw: drawBallPreview_xmark  },
+  { id:'circle',  label:'BOLA',    draw: drawBallPreview_circle  },
+  { id:'star',    label:'ESTRELA', draw: drawBallPreview_star    },
+  { id:'diamond', label:'DIAMANTE',draw: drawBallPreview_diamond },
+];
+const PADDLE_SKINS = [
+  { id:'pencil',  label:'LÁPIS',   draw: drawPaddlePreview_pencil  },
+  { id:'classic', label:'CLÁSSICA',draw: drawPaddlePreview_classic  },
+  { id:'sword',   label:'ESPADA',  draw: drawPaddlePreview_sword    },
+  { id:'wand',    label:'VARINHA', draw: drawPaddlePreview_wand     },
+];
+
+function drawBallPreview_xmark(c) {
+  const ctx2=c.getContext('2d'); const s=c.width;
+  ctx2.clearRect(0,0,s,s);
+  ctx2.save(); ctx2.translate(s/2,s/2);
+  ctx2.shadowColor='#9b8fe8'; ctx2.shadowBlur=10;
+  ctx2.strokeStyle='#c4b5fd'; ctx2.lineWidth=s*0.14; ctx2.lineCap='round';
+  const hw=s*0.3;
+  ctx2.beginPath(); ctx2.moveTo(-hw,-hw); ctx2.lineTo(hw,hw); ctx2.stroke();
+  ctx2.beginPath(); ctx2.moveTo(hw,-hw); ctx2.lineTo(-hw,hw); ctx2.stroke();
+  ctx2.restore();
+}
+function drawBallPreview_circle(c) {
+  const ctx2=c.getContext('2d'); const s=c.width;
+  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s/2,s/2);
+  ctx2.shadowColor='#00eeff'; ctx2.shadowBlur=10;
+  const g=ctx2.createRadialGradient(-s*0.1,-s*0.1,s*0.04,0,0,s*0.38);
+  g.addColorStop(0,'#fff'); g.addColorStop(0.4,'#00eeff'); g.addColorStop(1,'#0044aa');
+  ctx2.fillStyle=g;
+  ctx2.beginPath(); ctx2.arc(0,0,s*0.38,0,Math.PI*2); ctx2.fill();
+  ctx2.restore();
+}
+function drawBallPreview_star(c) {
+  const ctx2=c.getContext('2d'); const s=c.width;
+  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s/2,s/2);
+  ctx2.shadowColor='#ffcc00'; ctx2.shadowBlur=10;
+  ctx2.fillStyle='#ffdd33';
+  const rs=s*0.4,ri=s*0.17;
+  ctx2.beginPath();
+  for(let i=0;i<5;i++){
+    const a=(i*4*Math.PI/5)-Math.PI/2, a2=((i*4+2)*Math.PI/5)-Math.PI/2;
+    if(i===0) ctx2.moveTo(Math.cos(a)*rs,Math.sin(a)*rs); else ctx2.lineTo(Math.cos(a)*rs,Math.sin(a)*rs);
+    ctx2.lineTo(Math.cos(a2)*ri,Math.sin(a2)*ri);
+  }
+  ctx2.closePath(); ctx2.fill(); ctx2.restore();
+}
+function drawBallPreview_diamond(c) {
+  const ctx2=c.getContext('2d'); const s=c.width;
+  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s/2,s/2);
+  ctx2.shadowColor='#ff4466'; ctx2.shadowBlur=10;
+  const g=ctx2.createLinearGradient(-s*0.38,0,s*0.38,0);
+  g.addColorStop(0,'#ff4466'); g.addColorStop(0.5,'#ffaacc'); g.addColorStop(1,'#ff4466');
+  ctx2.fillStyle=g;
+  ctx2.beginPath(); ctx2.moveTo(0,-s*0.4); ctx2.lineTo(s*0.38,0); ctx2.lineTo(0,s*0.4); ctx2.lineTo(-s*0.38,0); ctx2.closePath(); ctx2.fill();
+  ctx2.restore();
+}
+
+function drawPaddlePreview_pencil(c) {
+  const ctx2=c.getContext('2d'); const s=c.width;
+  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s*0.5,s*0.5);
+  ctx2.shadowColor='#00eeff'; ctx2.shadowBlur=8;
+  const w=s*0.28,h=s*0.72,x=-s*0.14,y=-s*0.36;
+  const tip=h*0.2,er=h*0.1;
+  // corpo
+  ctx2.fillStyle='#00eeff';
+  ctx2.beginPath(); ctx2.roundRect(x,y+er,w,h-er-tip,2); ctx2.fill();
+  // borracha
+  ctx2.shadowBlur=0; ctx2.fillStyle='rgba(0,238,255,0.35)';
+  ctx2.beginPath(); ctx2.roundRect(x+w*0.1,y,w*0.8,er+2,2); ctx2.fill();
+  // ponta
+  ctx2.fillStyle='rgba(255,220,120,0.9)';
+  ctx2.beginPath(); ctx2.moveTo(s*0,y+h); ctx2.lineTo(x+w*0.05,y+h-tip); ctx2.lineTo(x+w*0.95,y+h-tip); ctx2.closePath(); ctx2.fill();
+  ctx2.restore();
+}
+function drawPaddlePreview_classic(c) {
+  const ctx2=c.getContext('2d'); const s=c.width;
+  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s*0.5,s*0.5);
+  ctx2.shadowColor='#00eeff'; ctx2.shadowBlur=8;
+  const w=s*0.28,h=s*0.72;
+  const g=ctx2.createLinearGradient(-w/2,-h/2,w/2,h/2);
+  g.addColorStop(0,'#00eeff'); g.addColorStop(0.5,'rgba(0,238,255,0.7)'); g.addColorStop(1,'#00eeff');
+  ctx2.fillStyle=g;
+  ctx2.beginPath(); ctx2.roundRect(-w/2,-h/2,w,h,6); ctx2.fill();
+  ctx2.restore();
+}
+function drawPaddlePreview_sword(c) {
+  const ctx2=c.getContext('2d'); const s=c.width;
+  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s*0.5,s*0.5);
+  ctx2.shadowColor='#00eeff'; ctx2.shadowBlur=8;
+  const h=s*0.72;
+  ctx2.fillStyle='rgba(200,220,255,0.8)';
+  ctx2.beginPath(); ctx2.moveTo(0,-h*0.5); ctx2.lineTo(-s*0.1,h*0.35); ctx2.lineTo(s*0.1,h*0.35); ctx2.closePath(); ctx2.fill();
+  ctx2.fillStyle='rgba(0,238,255,0.9)';
+  ctx2.beginPath(); ctx2.roundRect(-s*0.18,h*0.3,s*0.36,s*0.06,2); ctx2.fill();
+  ctx2.fillStyle='rgba(120,80,40,0.9)';
+  ctx2.beginPath(); ctx2.roundRect(-s*0.07,h*0.36,s*0.14,h*0.12,2); ctx2.fill();
+  ctx2.restore();
+}
+function drawPaddlePreview_wand(c) {
+  const ctx2=c.getContext('2d'); const s=c.width;
+  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s*0.5,s*0.5);
+  ctx2.shadowColor='#00ffcc'; ctx2.shadowBlur=8;
+  const h=s*0.72;
+  ctx2.fillStyle='rgba(80,40,20,0.9)';
+  ctx2.beginPath(); ctx2.roundRect(-s*0.07,-h*0.35,s*0.14,h*0.85,3); ctx2.fill();
+  ctx2.shadowBlur=12; ctx2.fillStyle='#00ffcc';
+  const rs=s*0.18,ri=s*0.08, cx2=0, cy2=-h*0.45;
+  ctx2.beginPath();
+  for(let i=0;i<5;i++){
+    const a=(i*4*Math.PI/5)-Math.PI/2,a2=((i*4+2)*Math.PI/5)-Math.PI/2;
+    if(i===0) ctx2.moveTo(cx2+Math.cos(a)*rs,cy2+Math.sin(a)*rs); else ctx2.lineTo(cx2+Math.cos(a)*rs,cy2+Math.sin(a)*rs);
+    ctx2.lineTo(cx2+Math.cos(a2)*ri,cy2+Math.sin(a2)*ri);
+  }
+  ctx2.closePath(); ctx2.fill();
+  ctx2.restore();
+}
+
+function buildSkinGrid(gridId, skins, currentId, onSelect) {
+  const grid = document.getElementById(gridId);
+  if (!grid) return;
+  grid.innerHTML = '';
+  skins.forEach(skin => {
+    const btn = document.createElement('button');
+    btn.className = 'skin-btn' + (skin.id === currentId ? ' selected' : '');
+    const c = document.createElement('canvas');
+    c.width = 44; c.height = 44; c.style.cssText='width:44px;height:44px;';
+    skin.draw(c);
+    btn.appendChild(c);
+    const lbl = document.createElement('span');
+    lbl.textContent = skin.label;
+    btn.appendChild(lbl);
+    btn.onclick = () => {
+      onSelect(skin.id);
+      grid.querySelectorAll('.skin-btn').forEach(b=>b.classList.remove('selected'));
+      btn.classList.add('selected');
+    };
+    grid.appendChild(btn);
+  });
+}
+
+function showSkins() {
+  SFX.menuBoop();
+  stopMenuPreview();
+  buildSkinGrid('ball-skin-grid', BALL_SKINS, selectedBallSkin, id => {
+    selectedBallSkin = id;
+    localStorage.setItem('mathpong_ball_skin', id);
+  });
+  buildSkinGrid('paddle-skin-grid', PADDLE_SKINS, selectedPaddleSkin, id => {
+    selectedPaddleSkin = id;
+    localStorage.setItem('mathpong_paddle_skin', id);
+  });
+  hide('screen-menu');
+  show('screen-skins');
+}
+function closeSkins() {
+  SFX.menuBoop();
+  hide('screen-skins');
+  show('screen-menu');
+  startMenuPreview();
+}
+
 function showSettings() {
   const grid = document.getElementById('level-grid');
   grid.innerHTML = '';
@@ -3094,6 +3468,23 @@ function closeLeaderboard() {
 </div>
 
 
+
+<!-- ══ SKINS MODAL ═══════════════════════════════════════════════════════════ -->
+<div id="screen-skins" class="screen hidden">
+  <div style="font-size:10px;letter-spacing:6px;color:#cc88ff;text-shadow:0 0 14px rgba(200,100,255,0.7);border:1px solid rgba(200,100,255,0.2);padding:5px 16px;border-radius:3px;margin-bottom:20px;position:relative;z-index:1;">🎨 PERSONALIZAR</div>
+
+  <div class="skin-section">
+    <div class="skin-section-title">⚽ SKIN DA BOLA</div>
+    <div class="skin-grid" id="ball-skin-grid"></div>
+  </div>
+
+  <div class="skin-section">
+    <div class="skin-section-title">🏓 SKIN DA RAQUETE</div>
+    <div class="skin-grid" id="paddle-skin-grid"></div>
+  </div>
+
+  <button class="btn-secondary" onclick="closeSkins()" style="margin-top:8px;border-color:rgba(200,100,255,0.5);color:#cc88ff;">SALVAR</button>
+</div>
 
 <!-- ══ COMO JOGAR ════════════════════════════════════════════════════════════ -->
 <div id="screen-howto" class="screen hidden">
