@@ -22,10 +22,40 @@
 /* ── PERFORMANCE: reduce effects on low-end devices ── */
 @media (max-width: 768px) {
   #scanlines { display: none; } /* scanlines cause repaints on mobile */
+  :root { --hud-h: 58px; }
+  .menu-logo { font-size: clamp(44px, 14vw, 70px) !important; }
+  .input-group { width: min(280px, 90vw) !important; }
+  .btn-primary { font-size: 12px !important; letter-spacing: 2px !important; padding: 14px 32px !important; }
+  .btn-secondary { font-size: 11px !important; padding: 12px 28px !important; }
+  #screen-howto, #screen-skins, #screen-leaderboard, #screen-settings {
+    padding: 16px 10px !important;
+    justify-content: flex-start !important;
+    padding-top: 28px !important;
+    overflow-y: auto !important;
+  }
+  .howto-section { width: min(340px, 92vw) !important; }
+  .effects-grid { grid-template-columns: 1fr !important; }
+  #roulette-overlay { gap: 4px !important; padding: 16px !important; }
+  #roulette-track-wrap { width: min(310px, 92vw) !important; }
 }
 @media (min-width: 600px) and (max-width: 1024px) {
   /* Tablet tweaks */
   :root { --hud-h: 70px; }
+  .menu-logo { font-size: clamp(60px, 10vw, 80px) !important; }
+  .input-group { width: min(340px, 80vw) !important; }
+  #screen-howto, #screen-skins, #screen-leaderboard {
+    padding: 24px 20px !important;
+    justify-content: flex-start !important;
+    overflow-y: auto !important;
+  }
+  .howto-section { width: min(500px, 90vw) !important; }
+}
+@media (min-width: 1025px) {
+  /* Desktop layout improvements */
+  :root { --hud-h: 68px; }
+  .menu-logo { font-size: clamp(72px, 9vw, 100px) !important; }
+  .input-group { width: min(320px, 75vw) !important; }
+  #opponent-label { font-size: 11px !important; }
 }
 canvas#c { will-change: contents; }
 
@@ -529,8 +559,9 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
   position:fixed; inset:0; z-index:250;
   display:flex; flex-direction:column;
   align-items:center; justify-content:center;
-  gap:0;
-  background: rgba(0,2,8,0.96);
+  gap:12px;
+  padding: 20px 12px;
+  background: rgba(0,2,8,0.97);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   opacity:0; pointer-events:none;
@@ -540,13 +571,15 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
 
 #roulette-winner-label {
   font-size:10px; letter-spacing:7px;
-  margin-bottom:10px;
+  margin-bottom:4px;
+  color: var(--green);
+  text-shadow: 0 0 12px rgba(0,255,136,0.6);
   font-family:'Share Tech Mono', monospace;
 }
 #roulette-winner-name {
   font-size:clamp(22px,7vw,34px);
   font-weight:900; letter-spacing:4px;
-  margin-bottom:6px;
+  margin-bottom:4px;
 }
 #roulette-winner-name.p0 { color:var(--cyan); text-shadow: 0 0 30px rgba(0,238,255,0.8); }
 #roulette-winner-name.p1 { color:var(--red);  text-shadow: 0 0 30px rgba(255,68,102,0.8); }
@@ -554,7 +587,7 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
 #roulette-title {
   font-size:10px; letter-spacing:6px; color:var(--gold);
   text-shadow: 0 0 14px rgba(255,204,0,0.7);
-  margin-bottom:22px;
+  margin-bottom:8px;
   border: 1px solid rgba(255,204,0,0.2);
   padding: 4px 14px; border-radius:3px;
 }
@@ -610,10 +643,9 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
 }
 .roulette-item {
   flex-shrink:0;
-  width: 100%; /* fill parent */
   text-align:center;
   padding: 14px 20px;
-  display:flex; flex-direction:column; align-items:center; gap:4px;
+  display:flex; flex-direction:column; align-items:center; gap:6px;
 }
 .roulette-item .r-icon { font-size:clamp(26px,8vw,36px); line-height:1; }
 .roulette-item .r-label {
@@ -905,6 +937,13 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
   position:fixed; top:calc(var(--hud-h,62px) + 8px); right:12px;
   display:flex; flex-direction:column; gap:6px;
   z-index:60; pointer-events:none;
+  max-width: 180px;
+}
+
+/* ── SCREEN SCROLL IMPROVEMENTS ── */
+#screen-howto, #screen-skins, #screen-leaderboard {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .effect-badge {
   display:flex; align-items:center; gap:8px;
@@ -916,6 +955,8 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
   font-size:11px; letter-spacing:1px;
   animation: badgeIn .3s cubic-bezier(0.34,1.56,0.64,1);
   backdrop-filter: blur(8px);
+  position: relative;
+  overflow: hidden;
 }
 @keyframes badgeIn { from { opacity:0; transform: translateX(40px) scale(0.8); } }
 .effect-badge .eb-icon { font-size:16px; line-height:1; }
@@ -1812,10 +1853,8 @@ function spawnParticles(bx, by, color, count=14) {
     const a = (i/6) * Math.PI * 2, s = 3 + Math.random()*5;
     particles.push({ x: sx, y: sy, vx: Math.cos(a)*s, vy: Math.sin(a)*s, life: 0.7, color:'#fff', r: 0.8 });
   }
-  // Pixel explosion sprite overlay
-  if (explosionImg.complete && explosionImg.naturalWidth > 0) {
-    explosionOverlays.push({ x: sx, y: sy, life: 1.0 });
-  }
+  // Pixel explosion canvas overlay
+  explosionOverlays.push({ x: sx, y: sy, life: 1.0 });
 }
 
 function updateExplosionOverlays() {
@@ -1823,8 +1862,45 @@ function updateExplosionOverlays() {
   const eSize = Math.min(W, H) * 0.18;
   explosionOverlays.forEach(e => {
     ctx.save();
-    ctx.globalAlpha = e.life * 0.9;
-    ctx.drawImage(explosionImg, e.x - eSize/2, e.y - eSize/2, eSize, eSize);
+    const progress = 1 - e.life; // 0=start, 1=end
+    const numRings = 3;
+    for (let r = 0; r < numRings; r++) {
+      const ringProgress = Math.max(0, progress * numRings - r);
+      const ringRadius = eSize * 0.5 * ringProgress;
+      const alpha = e.life * (1 - r * 0.25);
+      if (ringRadius <= 0) continue;
+      const colors = ['#ff9900', '#ff4466', '#ffcc00'];
+      const grad = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, ringRadius);
+      grad.addColorStop(0, `rgba(255,255,255,${alpha * 0.7})`);
+      grad.addColorStop(0.3, `rgba(255,150,0,${alpha * 0.8})`);
+      grad.addColorStop(0.7, `rgba(255,68,0,${alpha * 0.4})`);
+      grad.addColorStop(1, `rgba(255,40,0,0)`);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, ringRadius, 0, Math.PI * 2);
+      ctx.fill();
+      // Bright ring edge
+      ctx.globalAlpha = alpha * 0.6;
+      ctx.strokeStyle = colors[r % colors.length];
+      ctx.lineWidth = 2 + r;
+      ctx.shadowColor = colors[r % colors.length];
+      ctx.shadowBlur = 16;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, ringRadius * 0.85, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    // Bright center flash
+    if (e.life > 0.6) {
+      const flashAlpha = (e.life - 0.6) / 0.4;
+      ctx.globalAlpha = flashAlpha * 0.9;
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = '#ffcc00';
+      ctx.shadowBlur = 30;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, eSize * 0.08 * flashAlpha, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
     e.life -= 0.07;
   });
@@ -3083,16 +3159,29 @@ function showRoulette(data) {
   // Animate spin
   // Force layout to get real width
   overlay.style.display = 'flex';
-  const itemW   = track.parentElement.getBoundingClientRect().width || track.parentElement.offsetWidth || window.innerWidth * 0.88;
-  const centerOffset = Math.floor(totalItems.length / 2) * itemW;
+  // Each item should be fixed size for consistent scroll
+  const ITEM_W = Math.min(340, window.innerWidth * 0.88);
+  const wrapEl = track.parentElement;
+
+  // Set fixed item widths
+  track.querySelectorAll('.roulette-item').forEach(el => {
+    el.style.width = ITEM_W + 'px';
+    el.style.flexShrink = '0';
+  });
+
+  // Center offset: position so that landingPos item is centered in the wrap
+  // targetX = -(landingPos * ITEM_W) + (ITEM_W/2 - ITEM_W/2) = -(landingPos * ITEM_W)
+  // But we want the item center at the wrap center, so offset = wrapWidth/2 - ITEM_W/2
+  const wrapW = wrapEl.getBoundingClientRect().width || ITEM_W;
+  const centerAdjust = (wrapW - ITEM_W) / 2;
 
   // Start at beginning
   track.style.transition = 'none';
-  track.style.transform  = `translateX(0px)`;
+  track.style.transform  = `translateX(${centerAdjust}px)`;
   // Force reflow
   track.getBoundingClientRect();
 
-  const targetX = -(landingPos * itemW);
+  const targetX = -(landingPos * ITEM_W) + centerAdjust;
 
   // Animate after a frame
   requestAnimationFrame(() => {
@@ -3103,8 +3192,9 @@ function showRoulette(data) {
 
       // Highlight active item during spin
       let highlightInterval = setInterval(() => {
-        const currentX = -parseFloat(track.style.transform.replace('translateX(','').replace('px)','') || 0);
-        const activeI  = Math.round(Math.abs(currentX) / itemW);
+        const currentTranslate = parseFloat(track.style.transform.replace('translateX(','').replace('px)','') || centerAdjust);
+        const scrolledPx = centerAdjust - currentTranslate;
+        const activeI  = Math.round(Math.max(0, scrolledPx) / ITEM_W);
         track.querySelectorAll('.roulette-item').forEach((el, i) => {
           el.classList.toggle('active', i === activeI);
         });
