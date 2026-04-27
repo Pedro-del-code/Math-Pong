@@ -120,6 +120,20 @@
 }
 canvas#c { will-change: contents; }
 
+/* ── PERFORMANCE: force GPU compositing on key elements ── */
+#hud, #mobile-controls, #math-overlay, #roulette-overlay, #countdown-overlay {
+  will-change: opacity;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+#scanlines, #vignette { will-change: auto; }
+
+/* Reduce motion for battery/performance on mobile */
+@media (max-width: 768px) and (prefers-reduced-motion: no-preference) {
+  .menu-logo { animation-duration: 6s !important; }
+  #screen-menu::before { animation-duration: 48s !important; }
+}
+
 html, body {
   width:100%; height:100%;
   background: var(--bg);
@@ -1334,22 +1348,34 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
   <div style="font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:3px;color:#1e1e1e;position:relative;z-index:1;margin-top:-8px">W / S  OU  ↑ / ↓  PARA MOVER</div>
   <div class="input-group">
     <input id="inp-name" type="text" placeholder="SEU NOME" maxlength="30" autocomplete="off" spellcheck="false">
-    <div class="select-wrap" style="position:relative;z-index:1;">
-      <select id="inp-serie" class="serie-select">
-        <option value="" disabled selected>SUA SÉRIE</option>
-        <optgroup label="── ENSINO FUNDAMENTAL ──">
-          <option value="6EF">6º ANO — EF</option>
-          <option value="7EF">7º ANO — EF</option>
-          <option value="8EF">8º ANO — EF</option>
-          <option value="9EF">9º ANO — EF</option>
-        </optgroup>
-        <optgroup label="── ENSINO MÉDIO ──">
-          <option value="1EM">1º ANO — EM</option>
-          <option value="2EM">2º ANO — EM</option>
-          <option value="3EM">3º ANO — EM</option>
-        </optgroup>
-      </select>
-      <div class="select-arrow">▼</div>
+    <div style="display:flex;gap:8px;position:relative;z-index:1;">
+      <div class="select-wrap" style="flex:1.6;">
+        <select id="inp-serie" class="serie-select">
+          <option value="" disabled selected>SÉRIE</option>
+          <optgroup label="── FUND. ──">
+            <option value="6">6º ANO</option>
+            <option value="7">7º ANO</option>
+            <option value="8">8º ANO</option>
+            <option value="9">9º ANO</option>
+          </optgroup>
+          <optgroup label="── MÉDIO ──">
+            <option value="1M">1º ANO</option>
+            <option value="2M">2º ANO</option>
+            <option value="3M">3º ANO</option>
+          </optgroup>
+        </select>
+        <div class="select-arrow">▼</div>
+      </div>
+      <div class="select-wrap" style="flex:1;">
+        <select id="inp-turma" class="serie-select">
+          <option value="" disabled selected>TURMA</option>
+          <option value="A">A</option>
+          <option value="B">B</option>
+          <option value="C">C</option>
+          <option value="D">D</option>
+        </select>
+        <div class="select-arrow">▼</div>
+      </div>
     </div>
     <button class="btn-primary" onclick="SFX.menuBoop();joinQueue()"><span>JOGAR AGORA</span></button>
     <button class="btn-secondary" onclick="SFX.menuBoop();startAIGame()" style="width:100%;margin-top:4px;padding:13px;font-size:11px;letter-spacing:2px;border-color:rgba(0,255,136,0.5);color:var(--green);touch-action:manipulation;">🤖 TREINAR CONTRA IA</button>
@@ -1675,33 +1701,95 @@ let paddleScaleP1 = 1.0;
 let paddleHitFlash = [0, 0]; // flash timer ao acertar
 
 // ══ DRAW SCENE (CLASSIC PONG 2D) ══════════════════════════════════════════════
+let _bgGrad = null;
+let _bgGradW = 0, _bgGradH = 0;
+
 function drawBackground() {
-  // Deep space background
-  ctx.fillStyle = '#000306';
+  // Fundo sólido escuro premium
+  ctx.fillStyle = '#020408';
   ctx.fillRect(0, 0, W, H);
-  // Subtle center glow
-  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(W, H) * 0.7);
-  grad.addColorStop(0, 'rgba(0,15,30,0.3)');
-  grad.addColorStop(1, 'transparent');
-  ctx.fillStyle = grad;
+
+  // Cache gradiente - recriar só no resize
+  if (!_bgGrad || _bgGradW !== W || _bgGradH !== H) {
+    // Gradiente sutil de profundidade — sem azul "lago"
+    _bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+    _bgGrad.addColorStop(0,   'rgba(10,5,20,0.85)');
+    _bgGrad.addColorStop(0.5, 'rgba(4,2,10,0.4)');
+    _bgGrad.addColorStop(1,   'rgba(10,5,20,0.85)');
+    _bgGradW = W; _bgGradH = H;
+  }
+  ctx.fillStyle = _bgGrad;
   ctx.fillRect(0, 0, W, H);
+
+  // Grade hexagonal sutil (campo tech)
+  if (!IS_MOBILE) {
+    const gridSize = 52;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(100,60,255,0.045)';
+    ctx.lineWidth = 0.5;
+    for (let x = 0; x < W + gridSize; x += gridSize) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+    for (let y = 0; y < H + gridSize; y += gridSize) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Borda do campo (retângulo interno luminoso)
+  const padX = W * 0.055, padY = H * 0.04;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(100,60,255,0.18)';
+  ctx.lineWidth = 1;
+  ctx.shadowColor = 'rgba(120,80,255,0.25)';
+  ctx.shadowBlur = 8;
+  ctx.strokeRect(padX, padY, W - padX * 2, H - padY * 2);
+  ctx.restore();
+
+  // Círculo central decorativo
+  ctx.save();
+  const circleR = Math.min(W, H) * 0.09;
+  ctx.strokeStyle = 'rgba(100,60,255,0.12)';
+  ctx.lineWidth = 1;
+  ctx.shadowColor = 'rgba(120,80,255,0.2)';
+  ctx.shadowBlur = 10;
+  ctx.beginPath();
+  ctx.arc(cx, cy, circleR, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
 }
 
+let _centerLineGrad = null;
+let _centerLineH = 0;
+
 function drawCenterLine() {
-  const dashH = H * 0.04;
-  const gap   = H * 0.022;
-  const x     = cx;
-  ctx.fillStyle = 'rgba(255,255,255,0.08)';
-  for (let y = 0; y < H; y += dashH + gap) {
-    ctx.fillRect(x - 1, y, 2, dashH);
+  const dashH = H * 0.038;
+  const gap   = H * 0.018;
+
+  // Linha central com gradiente de cor
+  if (!_centerLineGrad || _centerLineH !== H) {
+    _centerLineGrad = ctx.createLinearGradient(cx - 24, 0, cx + 24, 0);
+    _centerLineGrad.addColorStop(0, 'transparent');
+    _centerLineGrad.addColorStop(0.3, 'rgba(120,80,255,0.06)');
+    _centerLineGrad.addColorStop(0.5, 'rgba(120,80,255,0.09)');
+    _centerLineGrad.addColorStop(0.7, 'rgba(120,80,255,0.06)');
+    _centerLineGrad.addColorStop(1, 'transparent');
+    _centerLineH = H;
   }
-  // Faint vertical glow line
-  const gline = ctx.createLinearGradient(cx-20, 0, cx+20, 0);
-  gline.addColorStop(0, 'transparent');
-  gline.addColorStop(0.5, 'rgba(0,238,255,0.015)');
-  gline.addColorStop(1, 'transparent');
-  ctx.fillStyle = gline;
-  ctx.fillRect(cx-20, 0, 40, H);
+  ctx.fillStyle = _centerLineGrad;
+  ctx.fillRect(cx - 24, 0, 48, H);
+
+  // Traços animados com leve glow roxo
+  ctx.save();
+  ctx.shadowColor = 'rgba(140,100,255,0.5)';
+  ctx.shadowBlur = IS_MOBILE ? 4 : 8;
+  for (let y = 0; y < H; y += dashH + gap) {
+    // Gradient por dash para dar profundidade
+    const alpha = 0.12 + 0.06 * Math.sin((y / H) * Math.PI);
+    ctx.fillStyle = `rgba(160,120,255,${alpha})`;
+    ctx.fillRect(cx - 1, y, 2, dashH);
+  }
+  ctx.restore();
 }
 
 // Convert game coords (-1..1) to screen pixels
@@ -1715,6 +1803,12 @@ function gs(v) { return v * Math.min(W, H) * 0.88 * 0.5; }
 let selectedPaddleSkin = localStorage.getItem('mathpong_paddle_skin') || 'pencil';
 let selectedBallSkin   = localStorage.getItem('mathpong_ball_skin')   || 'xmark';
 
+// Detect mobile once for perf decisions
+const IS_MOBILE = ('ontouchstart' in window) || window.innerWidth < 768;
+// Reduced shadow on mobile saves significant GPU time
+const SHADOW_PADDLE = IS_MOBILE ? 12 : 28;
+const SHADOW_PADDLE_HIT = IS_MOBILE ? 24 : 56;
+
 function drawPaddleRect(px, py, isP1) {
   const playerIdx = isP1 ? 0 : 1;
   const scale = playerIdx === 0 ? paddleScaleP0 : paddleScaleP1;
@@ -1724,152 +1818,297 @@ function drawPaddleRect(px, py, isP1) {
   const sh = gs(PADDLE_H * 2) * scale;
   const sx = gx(px) - sw / 2;
   const sy = gy(py) - sh / 2;
-  const r  = sw * 0.35;
+  const r  = sw * 0.38;
 
   ctx.save();
   ctx.shadowColor = color;
-  ctx.shadowBlur  = hitF > 0 ? 56 : 28;
+  ctx.shadowBlur  = hitF > 0 ? SHADOW_PADDLE_HIT : SHADOW_PADDLE;
 
   const skin = selectedPaddleSkin;
 
   if (skin === 'pencil') {
-    // ── Lápis (kit inicial) ──────────────────────────────────────────────
+    // ── Lápis REDESENHADO — mais realista e detalhado ──
     const bodyColor = hitF > 0 ? '#fff' : color;
-    const tipH = sh * 0.15;
+    const tipH = sh * 0.16;
     const eraserH = sh * 0.1;
+    const bandH = sh * 0.04;
+    const bodyH = sh - eraserH - bandH - tipH;
 
-    // Corpo do lápis (retângulo arredondado no topo)
+    // Corpo principal com gradiente lateral elegante
     const grad = ctx.createLinearGradient(sx, sy, sx + sw, sy);
-    grad.addColorStop(0, bodyColor);
-    grad.addColorStop(0.5, isP1 ? 'rgba(0,238,255,0.6)' : 'rgba(255,68,102,0.6)');
-    grad.addColorStop(1, bodyColor);
+    if (hitF > 0) {
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.4, bodyColor);
+      grad.addColorStop(0.6, '#ffffff');
+      grad.addColorStop(1, bodyColor);
+    } else {
+      grad.addColorStop(0, isP1 ? 'rgba(0,200,230,0.7)' : 'rgba(230,50,80,0.7)');
+      grad.addColorStop(0.35, bodyColor);
+      grad.addColorStop(0.65, isP1 ? 'rgba(0,150,200,0.5)' : 'rgba(180,30,60,0.5)');
+      grad.addColorStop(1, isP1 ? 'rgba(0,200,230,0.7)' : 'rgba(230,50,80,0.7)');
+    }
     ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.roundRect(sx, sy + eraserH, sw, sh - eraserH - tipH, r * 0.2);
+    ctx.roundRect(sx, sy + eraserH + bandH, sw, bodyH, r * 0.15);
     ctx.fill();
 
-    // Borracha (topo)
+    // Linha lateral esquerda (brilho)
     ctx.shadowBlur = 0;
-    ctx.fillStyle = isP1 ? 'rgba(0,238,255,0.4)' : 'rgba(255,68,102,0.4)';
+    ctx.fillStyle = isP1 ? 'rgba(180,255,255,0.25)' : 'rgba(255,180,190,0.25)';
     ctx.beginPath();
-    ctx.roundRect(sx + sw*0.1, sy, sw*0.8, eraserH + r*0.2, r*0.3);
+    ctx.roundRect(sx + sw * 0.08, sy + eraserH + bandH + sh * 0.04, sw * 0.12, bodyH - sh * 0.08, 2);
     ctx.fill();
 
-    // Ponta (triângulo na base)
-    ctx.fillStyle = 'rgba(255,220,120,0.9)';
+    // Banda metálica (separação borracha/corpo)
+    ctx.fillStyle = isP1 ? 'rgba(0,180,200,0.9)' : 'rgba(200,40,70,0.9)';
     ctx.beginPath();
-    ctx.moveTo(sx + sw*0.5, sy + sh); // ponta
-    ctx.lineTo(sx + sw*0.05, sy + sh - tipH);
-    ctx.lineTo(sx + sw*0.95, sy + sh - tipH);
+    ctx.roundRect(sx + sw * 0.05, sy + eraserH, sw * 0.9, bandH, 1);
+    ctx.fill();
+    // Brilho na banda
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.beginPath();
+    ctx.roundRect(sx + sw * 0.1, sy + eraserH + bandH * 0.1, sw * 0.8, bandH * 0.35, 1);
+    ctx.fill();
+
+    // Borracha (topo) com gradiente
+    const eraserGrad = ctx.createLinearGradient(sx, sy, sx + sw, sy);
+    eraserGrad.addColorStop(0, isP1 ? 'rgba(0,180,210,0.6)' : 'rgba(210,60,90,0.6)');
+    eraserGrad.addColorStop(0.5, isP1 ? 'rgba(0,238,255,0.85)' : 'rgba(255,80,120,0.85)');
+    eraserGrad.addColorStop(1, isP1 ? 'rgba(0,180,210,0.6)' : 'rgba(210,60,90,0.6)');
+    ctx.fillStyle = eraserGrad;
+    ctx.beginPath();
+    ctx.roundRect(sx + sw * 0.08, sy, sw * 0.84, eraserH + r * 0.2, r * 0.4);
+    ctx.fill();
+
+    // Madeira exposta (ponta afunilada)
+    const woodGrad = ctx.createLinearGradient(sx, 0, sx + sw, 0);
+    woodGrad.addColorStop(0, 'rgba(140,85,40,0.9)');
+    woodGrad.addColorStop(0.5, 'rgba(200,140,70,0.95)');
+    woodGrad.addColorStop(1, 'rgba(140,85,40,0.9)');
+    ctx.fillStyle = woodGrad;
+    ctx.beginPath();
+    const woodH = tipH * 0.52;
+    ctx.roundRect(sx + sw * 0.12, sy + sh - tipH, sw * 0.76, woodH, 1);
+    ctx.fill();
+
+    // Ponta do grafite (triângulo)
+    ctx.shadowColor = isP1 ? 'rgba(0,238,255,0.6)' : 'rgba(255,68,102,0.6)';
+    ctx.shadowBlur = IS_MOBILE ? 6 : 12;
+    ctx.fillStyle = isP1 ? 'rgba(0,200,230,0.9)' : 'rgba(230,60,90,0.9)';
+    ctx.beginPath();
+    ctx.moveTo(sx + sw * 0.5, sy + sh);
+    ctx.lineTo(sx + sw * 0.14, sy + sh - tipH + woodH);
+    ctx.lineTo(sx + sw * 0.86, sy + sh - tipH + woodH);
     ctx.closePath();
-    ctx.fill();
-
-    // Linha de madeira na ponta
-    ctx.fillStyle = 'rgba(180,120,60,0.7)';
-    ctx.beginPath();
-    ctx.roundRect(sx + sw*0.1, sy + sh - tipH, sw*0.8, tipH*0.25, 1);
     ctx.fill();
 
     // Linha central decorativa
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = isP1 ? 'rgba(0,238,255,0.3)' : 'rgba(255,68,102,0.3)';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = isP1 ? 'rgba(0,238,255,0.2)' : 'rgba(255,68,102,0.2)';
+    ctx.lineWidth = 0.8;
+    ctx.setLineDash([3, 5]);
     ctx.beginPath();
-    ctx.moveTo(sx + sw*0.5, sy + eraserH);
-    ctx.lineTo(sx + sw*0.5, sy + sh - tipH);
+    ctx.moveTo(sx + sw * 0.5, sy + eraserH + bandH + sh * 0.05);
+    ctx.lineTo(sx + sw * 0.5, sy + sh - tipH);
     ctx.stroke();
+    ctx.setLineDash([]);
 
   } else if (skin === 'sword') {
-    // ── Espada ────────────────────────────────────────────────────────────
+    // ── Espada REDESENHADA — mais épica ──
     const bodyColor = hitF > 0 ? '#fff' : color;
-    // Lâmina
+    const tipH = sh * 0.06;
+    const guardH = sh * 0.07;
+    const handleH = sh * 0.18;
+    const bladeH = sh - tipH - guardH - handleH;
+
+    // Lâmina com gradiente e reflexo
     const bladeGrad = ctx.createLinearGradient(sx, sy, sx + sw, sy);
-    bladeGrad.addColorStop(0, 'rgba(200,220,255,0.3)');
-    bladeGrad.addColorStop(0.4, bodyColor);
-    bladeGrad.addColorStop(0.6, '#fff');
-    bladeGrad.addColorStop(1, 'rgba(200,220,255,0.3)');
+    bladeGrad.addColorStop(0, 'rgba(180,210,255,0.2)');
+    bladeGrad.addColorStop(0.3, bodyColor);
+    bladeGrad.addColorStop(0.5, '#ffffff');
+    bladeGrad.addColorStop(0.7, bodyColor);
+    bladeGrad.addColorStop(1, 'rgba(180,210,255,0.2)');
     ctx.fillStyle = bladeGrad;
     ctx.beginPath();
-    ctx.moveTo(sx + sw*0.5, sy);          // ponta
-    ctx.lineTo(sx + sw*0.3, sy + sh*0.85);
-    ctx.lineTo(sx + sw*0.7, sy + sh*0.85);
+    ctx.moveTo(sx + sw * 0.5, sy);             // ponta
+    ctx.lineTo(sx + sw * 0.15, sy + bladeH);
+    ctx.lineTo(sx + sw * 0.85, sy + bladeH);
     ctx.closePath();
     ctx.fill();
-    // Guarda
+
+    // Fio da lâmina (reflexo diagonal)
     ctx.shadowBlur = 0;
-    ctx.fillStyle = isP1 ? 'rgba(0,238,255,0.8)' : 'rgba(255,68,102,0.8)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.lineWidth = 0.8;
     ctx.beginPath();
-    ctx.roundRect(sx + sw*0.05, sy + sh*0.82, sw*0.9, sh*0.06, 2);
+    ctx.moveTo(sx + sw * 0.5, sy + tipH);
+    ctx.lineTo(sx + sw * 0.35, sy + bladeH * 0.7);
+    ctx.stroke();
+
+    // Guarda cruciforme
+    ctx.shadowColor = color;
+    ctx.shadowBlur = IS_MOBILE ? 8 : 16;
+    const guardGrad = ctx.createLinearGradient(sx, 0, sx + sw, 0);
+    guardGrad.addColorStop(0, isP1 ? 'rgba(0,150,180,0.8)' : 'rgba(180,30,60,0.8)');
+    guardGrad.addColorStop(0.5, bodyColor);
+    guardGrad.addColorStop(1, isP1 ? 'rgba(0,150,180,0.8)' : 'rgba(180,30,60,0.8)');
+    ctx.fillStyle = guardGrad;
+    ctx.beginPath();
+    ctx.roundRect(sx, sy + bladeH, sw, guardH, 3);
     ctx.fill();
-    // Punho
-    ctx.fillStyle = 'rgba(120,80,40,0.9)';
+    // Brilho da guarda
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
     ctx.beginPath();
-    ctx.roundRect(sx + sw*0.35, sy + sh*0.88, sw*0.3, sh*0.12, 3);
+    ctx.roundRect(sx + sw * 0.05, sy + bladeH + guardH * 0.1, sw * 0.9, guardH * 0.3, 2);
+    ctx.fill();
+
+    // Punho com textura
+    const handleGrad = ctx.createLinearGradient(sx, 0, sx + sw, 0);
+    handleGrad.addColorStop(0, 'rgba(60,35,15,0.95)');
+    handleGrad.addColorStop(0.4, 'rgba(120,70,30,0.9)');
+    handleGrad.addColorStop(0.6, 'rgba(100,55,20,0.9)');
+    handleGrad.addColorStop(1, 'rgba(60,35,15,0.95)');
+    ctx.fillStyle = handleGrad;
+    const hx = sx + sw * 0.3;
+    ctx.beginPath();
+    ctx.roundRect(hx, sy + bladeH + guardH, sw * 0.4, handleH, 4);
+    ctx.fill();
+    // Wrapping do punho
+    for (let i = 0; i < 4; i++) {
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      const wrapY = sy + bladeH + guardH + handleH * (0.15 + i * 0.2);
+      ctx.fillRect(hx, wrapY, sw * 0.4, 1.5);
+    }
+    // Pomo
+    ctx.shadowColor = color;
+    ctx.shadowBlur = IS_MOBILE ? 8 : 14;
+    ctx.fillStyle = bodyColor;
+    ctx.beginPath();
+    ctx.arc(sx + sw * 0.5, sy + sh - (sh * 0.035), sw * 0.22, 0, Math.PI * 2);
     ctx.fill();
 
   } else if (skin === 'wand') {
-    // ── Varinha mágica ────────────────────────────────────────────────────
+    // ── Varinha mágica REDESENHADA — mais mágica ──
     const bodyColor = hitF > 0 ? '#fff' : color;
-    // Cabo
-    const wandGrad = ctx.createLinearGradient(sx, sy, sx+sw, sy);
-    wandGrad.addColorStop(0, 'rgba(80,40,20,0.9)');
-    wandGrad.addColorStop(0.5, bodyColor);
-    wandGrad.addColorStop(1, 'rgba(80,40,20,0.9)');
+    const starR = sw * 0.52;
+    const wandW = sw * 0.28;
+
+    // Cabo com textura de madeira escura
+    const wandGrad = ctx.createLinearGradient(sx, sy, sx + sw, sy);
+    wandGrad.addColorStop(0, 'rgba(40,20,8,0.95)');
+    wandGrad.addColorStop(0.3, 'rgba(80,40,15,0.9)');
+    wandGrad.addColorStop(0.5, bodyColor + 'bb');
+    wandGrad.addColorStop(0.7, 'rgba(80,40,15,0.9)');
+    wandGrad.addColorStop(1, 'rgba(40,20,8,0.95)');
     ctx.fillStyle = wandGrad;
+    const wx = sx + (sw - wandW) / 2;
     ctx.beginPath();
-    ctx.roundRect(sx + sw*0.35, sy + sh*0.15, sw*0.3, sh*0.85, r*0.1);
+    ctx.roundRect(wx, sy + sh * 0.2, wandW, sh * 0.8, wandW * 0.15);
     ctx.fill();
-    // Estrela na ponta
-    ctx.shadowBlur = hitF > 0 ? 30 : 18;
-    ctx.fillStyle = hitF > 0 ? '#fff' : (isP1 ? '#00ffcc' : '#ffcc00');
-    const cx2 = sx + sw*0.5, cy2 = sy + sh*0.1, rs = sw*0.45;
+    // Anéis decorativos no cabo
+    for (let i = 0; i < 5; i++) {
+      ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.25)';
+      ctx.fillRect(wx, sy + sh * 0.2 + sh * 0.8 * (i / 5), wandW, 2);
+    }
+
+    // Orb luminoso na ponta
+    ctx.shadowBlur = hitF > 0 ? (IS_MOBILE ? 40 : 70) : (IS_MOBILE ? 22 : 44);
+    ctx.shadowColor = hitF > 0 ? '#fff' : (isP1 ? '#00ffee' : '#ff88cc');
+    const orbColor = hitF > 0 ? '#fff' : (isP1 ? '#00ffcc' : '#ff66aa');
+    const orbX = sx + sw * 0.5;
+    const orbY = sy + sh * 0.12;
+
+    // Halo externo
+    const haloGrad = ctx.createRadialGradient(orbX, orbY, 0, orbX, orbY, starR * 1.3);
+    haloGrad.addColorStop(0, orbColor + 'cc');
+    haloGrad.addColorStop(0.5, orbColor + '44');
+    haloGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = haloGrad;
     ctx.beginPath();
-    for(let i=0;i<5;i++){
-      const a = (i*4*Math.PI/5) - Math.PI/2;
-      const a2 = ((i*4+2)*Math.PI/5) - Math.PI/2;
-      if(i===0) ctx.moveTo(cx2+Math.cos(a)*rs, cy2+Math.sin(a)*rs);
-      else ctx.lineTo(cx2+Math.cos(a)*rs, cy2+Math.sin(a)*rs);
-      ctx.lineTo(cx2+Math.cos(a2)*rs*0.4, cy2+Math.sin(a2)*rs*0.4);
+    ctx.arc(orbX, orbY, starR * 1.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Estrela principal
+    ctx.fillStyle = orbColor;
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const a  = (i * 4 * Math.PI / 5) - Math.PI / 2;
+      const a2 = ((i * 4 + 2) * Math.PI / 5) - Math.PI / 2;
+      if (i === 0) ctx.moveTo(orbX + Math.cos(a) * starR, orbY + Math.sin(a) * starR);
+      else ctx.lineTo(orbX + Math.cos(a) * starR, orbY + Math.sin(a) * starR);
+      ctx.lineTo(orbX + Math.cos(a2) * starR * 0.42, orbY + Math.sin(a2) * starR * 0.42);
     }
     ctx.closePath();
     ctx.fill();
+    // Brilho central
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.beginPath();
+    ctx.arc(orbX - starR * 0.15, orbY - starR * 0.2, starR * 0.18, 0, Math.PI * 2);
+    ctx.fill();
 
   } else {
-    // ── Classic (padrão anterior) ─────────────────────────────────────────
+    // ── Classic REDESENHADO — mais refinado ──
     const grad = ctx.createLinearGradient(sx, sy, sx + sw, sy + sh);
     if (hitF > 0) {
       grad.addColorStop(0, '#fff');
-      grad.addColorStop(0.5, color);
-      grad.addColorStop(1, '#fff');
-    } else {
-      grad.addColorStop(0, color);
-      grad.addColorStop(0.5, isP1 ? 'rgba(0,238,255,0.7)' : 'rgba(255,68,102,0.7)');
+      grad.addColorStop(0.3, color);
+      grad.addColorStop(0.7, '#fff');
       grad.addColorStop(1, color);
+    } else {
+      grad.addColorStop(0, isP1 ? 'rgba(0,180,220,0.8)' : 'rgba(220,40,80,0.8)');
+      grad.addColorStop(0.3, color);
+      grad.addColorStop(0.6, isP1 ? 'rgba(0,150,190,0.65)' : 'rgba(190,30,60,0.65)');
+      grad.addColorStop(1, isP1 ? 'rgba(0,180,220,0.8)' : 'rgba(220,40,80,0.8)');
     }
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.roundRect(sx, sy, sw, sh, r);
     ctx.fill();
+
+    // Reflexo lateral
     ctx.shadowBlur = 0;
-    ctx.fillStyle = isP1 ? 'rgba(180,255,255,0.2)' : 'rgba(255,180,190,0.2)';
+    ctx.fillStyle = isP1 ? 'rgba(180,255,255,0.22)' : 'rgba(255,180,190,0.22)';
     ctx.beginPath();
-    ctx.roundRect(sx + sw*0.15, sy + sh*0.05, sw*0.3, sh*0.9, r*0.5);
+    ctx.roundRect(sx + sw * 0.12, sy + sh * 0.06, sw * 0.22, sh * 0.88, r * 0.5);
     ctx.fill();
+
+    // Borda interior sutil
+    ctx.strokeStyle = isP1 ? 'rgba(0,238,255,0.2)' : 'rgba(255,68,102,0.2)';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.roundRect(sx + 2, sy + 2, sw - 4, sh - 4, r - 1);
+    ctx.stroke();
+
+    // Detalhe central (linha horizontal)
+    ctx.fillStyle = isP1 ? 'rgba(0,238,255,0.15)' : 'rgba(255,68,102,0.15)';
+    ctx.fillRect(sx + sw * 0.15, sy + sh * 0.49, sw * 0.7, 1.5);
   }
 
   if (paddleHitFlash[playerIdx] > 0) paddleHitFlash[playerIdx] -= 0.12;
   ctx.restore();
 }
 
+const TRAIL_MAX    = IS_MOBILE ? 5 : 10;
+const SHADOW_BALL  = IS_MOBILE ? 14 : 32;
+const SHADOW_BALL2 = IS_MOBILE ? 5  : 8;
+
 function drawBallTrail() {
   const r = gs(BALL_R * 2);
   for (let i = 0; i < ballTrail.length; i++) {
     const t = ballTrail[i];
-    const alpha = (i / ballTrail.length) * 0.35;
-    const size  = r * 0.5 * (i / ballTrail.length);
+    const progress = i / ballTrail.length;
+    const alpha = progress * 0.45;
+    const size  = r * 0.65 * progress;
+    if (size <= 0) continue;
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.fillStyle = '#c4b5fd';
+    // Gradiente de cor no trail (roxo → ciano)
+    const hue = 270 - progress * 80; // roxo para azul
+    ctx.fillStyle = `hsl(${hue}, 80%, 65%)`;
+    ctx.shadowColor = `hsl(${hue}, 90%, 70%)`;
+    ctx.shadowBlur = IS_MOBILE ? 4 : 8;
     ctx.beginPath();
     ctx.arc(gx(t.x), gy(t.y), size, 0, Math.PI * 2);
     ctx.fill();
@@ -1884,82 +2123,170 @@ function drawBallRect(bx, by) {
 
   // Update trail
   ballTrail.push({x: bx, y: by});
-  if (ballTrail.length > 10) ballTrail.shift();
+  if (ballTrail.length > TRAIL_MAX) ballTrail.shift();
 
   const size = r * 2.8;
   ctx.save();
 
   const skin = selectedBallSkin;
-  const wobble = Math.sin(Date.now() * 0.004) * 0.08;
+  const t    = Date.now() * 0.003;
+  const wobble = Math.sin(t) * 0.07;
   ctx.translate(sx, sy);
   ctx.rotate(wobble);
 
   if (skin === 'xmark') {
-    // ── X mark vetorial (kit inicial, sem fundo) ──────────────────────────
-    ctx.shadowColor = '#9b8fe8';
-    ctx.shadowBlur  = 32;
-    const hw = size * 0.38;
-    const lw = size * 0.18;
-    ctx.strokeStyle = '#c4b5fd';
+    // ── X redesenhado — mais sólido e luminoso ──
+    ctx.shadowColor = '#a855f7';
+    ctx.shadowBlur  = SHADOW_BALL;
+    const hw = size * 0.4;
+    const lw = size * 0.22;
+
+    // Halo de fundo
+    const haloGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, hw * 1.1);
+    haloGrad.addColorStop(0, 'rgba(168,85,247,0.22)');
+    haloGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = haloGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, hw * 1.1, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Traço principal do X
+    ctx.strokeStyle = '#c084fc';
     ctx.lineWidth = lw;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    // Brilho interno
-    ctx.shadowColor = '#fff';
-    ctx.shadowBlur = 8;
-    // Linha diagonal \
+    ctx.shadowColor = '#e879f9';
+    ctx.shadowBlur = IS_MOBILE ? 8 : 16;
     ctx.beginPath();
     ctx.moveTo(-hw, -hw);
     ctx.lineTo(hw, hw);
     ctx.stroke();
-    // Linha diagonal /
-    ctx.shadowColor = '#9b8fe8';
-    ctx.shadowBlur = 28;
     ctx.beginPath();
     ctx.moveTo(hw, -hw);
     ctx.lineTo(-hw, hw);
     ctx.stroke();
 
-  } else if (skin === 'circle') {
-    // ── Círculo brilhante ─────────────────────────────────────────────────
-    ctx.shadowColor = '#00eeff';
-    ctx.shadowBlur  = 28;
-    const grad = ctx.createRadialGradient(-size*0.15, -size*0.15, size*0.05, 0, 0, size*0.5);
-    grad.addColorStop(0, '#ffffff');
-    grad.addColorStop(0.4, '#00eeff');
-    grad.addColorStop(1, '#0044aa');
-    ctx.fillStyle = grad;
+    // Brilho central
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
     ctx.beginPath();
-    ctx.arc(0, 0, size*0.5, 0, Math.PI*2);
+    ctx.arc(-hw * 0.05, -hw * 0.05, lw * 0.35, 0, Math.PI * 2);
     ctx.fill();
 
-  } else if (skin === 'star') {
-    // ── Estrela ───────────────────────────────────────────────────────────
-    ctx.shadowColor = '#ffcc00';
-    ctx.shadowBlur  = 30;
-    ctx.fillStyle = '#ffdd33';
-    const rs = size*0.52, ri = size*0.22;
+  } else if (skin === 'circle') {
+    // ── Círculo premium — bola de plasma ──
+    ctx.shadowColor = '#00eeff';
+    ctx.shadowBlur  = IS_MOBILE ? 18 : 36;
+
+    // Halo externo
+    const haloGrad = ctx.createRadialGradient(0, 0, size * 0.2, 0, 0, size * 0.7);
+    haloGrad.addColorStop(0, 'rgba(0,238,255,0.0)');
+    haloGrad.addColorStop(0.7, 'rgba(0,238,255,0.12)');
+    haloGrad.addColorStop(1, 'rgba(0,238,255,0.0)');
+    ctx.fillStyle = haloGrad;
     ctx.beginPath();
-    for(let i=0;i<5;i++){
-      const a = (i*4*Math.PI/5) - Math.PI/2;
-      const a2 = ((i*4+2)*Math.PI/5) - Math.PI/2;
-      if(i===0) ctx.moveTo(Math.cos(a)*rs, Math.sin(a)*rs);
-      else ctx.lineTo(Math.cos(a)*rs, Math.sin(a)*rs);
-      ctx.lineTo(Math.cos(a2)*ri, Math.sin(a2)*ri);
+    ctx.arc(0, 0, size * 0.7, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bola principal
+    const grad = ctx.createRadialGradient(-size * 0.18, -size * 0.18, size * 0.03, 0, 0, size * 0.52);
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(0.25, '#80ffff');
+    grad.addColorStop(0.6, '#00eeff');
+    grad.addColorStop(1, '#0055bb');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Reflexo especular
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.beginPath();
+    ctx.ellipse(-size * 0.12, -size * 0.15, size * 0.14, size * 0.08, -Math.PI / 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Borda sutil
+    ctx.strokeStyle = 'rgba(0,238,255,0.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.5, 0, Math.PI * 2);
+    ctx.stroke();
+
+  } else if (skin === 'star') {
+    // ── Estrela premium — com brilho e halo ──
+    ctx.shadowColor = '#fbbf24';
+    ctx.shadowBlur  = IS_MOBILE ? 18 : 36;
+
+    // Halo de luz
+    const haloGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, size * 0.72);
+    haloGrad.addColorStop(0, 'rgba(251,191,36,0.22)');
+    haloGrad.addColorStop(0.6, 'rgba(251,191,36,0.08)');
+    haloGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = haloGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.72, 0, Math.PI * 2);
+    ctx.fill();
+
+    const rs = size * 0.54, ri = size * 0.22;
+    const starGrad = ctx.createRadialGradient(-rs * 0.15, -rs * 0.15, ri * 0.1, 0, 0, rs);
+    starGrad.addColorStop(0, '#fff7aa');
+    starGrad.addColorStop(0.35, '#fde047');
+    starGrad.addColorStop(0.7, '#f59e0b');
+    starGrad.addColorStop(1, '#b45309');
+    ctx.fillStyle = starGrad;
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const a  = (i * 4 * Math.PI / 5) - Math.PI / 2;
+      const a2 = ((i * 4 + 2) * Math.PI / 5) - Math.PI / 2;
+      if (i === 0) ctx.moveTo(Math.cos(a) * rs, Math.sin(a) * rs);
+      else ctx.lineTo(Math.cos(a) * rs, Math.sin(a) * rs);
+      ctx.lineTo(Math.cos(a2) * ri, Math.sin(a2) * ri);
     }
     ctx.closePath();
     ctx.fill();
 
+    // Brilho especular
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.beginPath();
+    ctx.arc(-rs * 0.2, -rs * 0.3, rs * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Raios de luz da estrela
+    ctx.strokeStyle = 'rgba(255,240,100,0.25)';
+    ctx.lineWidth = 0.8;
+    for (let i = 0; i < 5; i++) {
+      const a = (i * 4 * Math.PI / 5) - Math.PI / 2;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * rs, Math.sin(a) * rs);
+      ctx.lineTo(Math.cos(a) * rs * 1.45, Math.sin(a) * rs * 1.45);
+      ctx.stroke();
+    }
+
   } else if (skin === 'diamond') {
-    // ── Diamante ──────────────────────────────────────────────────────────
-    ctx.shadowColor = '#ff4466';
-    ctx.shadowBlur  = 28;
-    const dg = ctx.createLinearGradient(-size*0.5, 0, size*0.5, 0);
-    dg.addColorStop(0, '#ff4466');
-    dg.addColorStop(0.5, '#ffaacc');
-    dg.addColorStop(1, '#ff4466');
+    // ── Diamante premium — facetado e brilhante ──
+    ctx.shadowColor = '#f43f5e';
+    ctx.shadowBlur  = IS_MOBILE ? 18 : 36;
+    const hw2 = size * 0.52, hh2 = size * 0.52;
+
+    // Halo
+    const haloGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, hw2 * 1.2);
+    haloGrad.addColorStop(0, 'rgba(244,63,94,0.18)');
+    haloGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = haloGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, hw2 * 1.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Faceta principal (preenchimento gradiente)
+    const dg = ctx.createLinearGradient(-hw2, -hh2, hw2, hh2);
+    dg.addColorStop(0, '#fda4af');
+    dg.addColorStop(0.25, '#fb7185');
+    dg.addColorStop(0.5, '#ffffff');
+    dg.addColorStop(0.75, '#f43f5e');
+    dg.addColorStop(1, '#be123c');
     ctx.fillStyle = dg;
-    const hw2 = size*0.5, hh2 = size*0.5;
     ctx.beginPath();
     ctx.moveTo(0, -hh2);
     ctx.lineTo(hw2, 0);
@@ -1967,9 +2294,43 @@ function drawBallRect(bx, by) {
     ctx.lineTo(-hw2, 0);
     ctx.closePath();
     ctx.fill();
+
+    // Facetas internas (sombreamento)
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.beginPath();
+    ctx.moveTo(0, -hh2);
+    ctx.lineTo(hw2 * 0.55, -hh2 * 0.1);
+    ctx.lineTo(0, 0);
+    ctx.lineTo(-hw2 * 0.55, -hh2 * 0.1);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.beginPath();
+    ctx.moveTo(0, hh2);
+    ctx.lineTo(hw2 * 0.55, hh2 * 0.1);
+    ctx.lineTo(0, 0);
+    ctx.lineTo(-hw2 * 0.55, hh2 * 0.1);
+    ctx.closePath();
+    ctx.fill();
+
+    // Borda
     ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(0, -hh2);
+    ctx.lineTo(hw2, 0);
+    ctx.lineTo(0, hh2);
+    ctx.lineTo(-hw2, 0);
+    ctx.closePath();
     ctx.stroke();
+
+    // Reflexo especular
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.beginPath();
+    ctx.arc(-hw2 * 0.2, -hh2 * 0.28, hh2 * 0.1, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   ctx.restore();
@@ -1977,14 +2338,38 @@ function drawBallRect(bx, by) {
 
 function updateParticles() {
   particles = particles.filter(p => p.life > 0);
-  particles.forEach(p => {
-    p.x += p.vx; p.y += p.vy; p.vy += 0.12; p.life -= 0.04; p.vx *= 0.95;
-    ctx.save();
-    ctx.globalAlpha = p.life * 0.8;
-    ctx.shadowColor = p.color; ctx.shadowBlur = 6; ctx.fillStyle = p.color;
-    ctx.beginPath(); ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI*2); ctx.fill();
-    ctx.restore();
-  });
+  // Cap particle count to avoid spiral death on mobile
+  if (particles.length > (IS_MOBILE ? 40 : 80)) particles.splice(0, particles.length - (IS_MOBILE ? 40 : 80));
+
+  if (!IS_MOBILE) {
+    // Desktop: full quality with shadowBlur
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.vy += 0.12; p.life -= 0.04; p.vx *= 0.95;
+      ctx.save();
+      ctx.globalAlpha = p.life * 0.8;
+      ctx.shadowColor = p.color; ctx.shadowBlur = 6; ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+    });
+  } else {
+    // Mobile: batch by color, no shadowBlur
+    const byColor = {};
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.vy += 0.12; p.life -= 0.05; p.vx *= 0.95;
+      if (!byColor[p.color]) byColor[p.color] = [];
+      byColor[p.color].push(p);
+    });
+    Object.entries(byColor).forEach(([color, ps]) => {
+      ctx.fillStyle = color;
+      ps.forEach(p => {
+        ctx.globalAlpha = p.life * 0.7;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, Math.max(0.5, p.r * p.life), 0, Math.PI*2);
+        ctx.fill();
+      });
+    });
+    ctx.globalAlpha = 1;
+  }
 }
 
 // Explosion overlay sprites
@@ -1992,14 +2377,17 @@ let explosionOverlays = []; // {x, y, life, img}
 
 function spawnParticles(bx, by, color, count=14) {
   const sx = gx(bx); const sy = gy(by);
-  for (let i = 0; i < count; i++) {
+  const n = IS_MOBILE ? Math.min(6, count) : count;
+  for (let i = 0; i < n; i++) {
     const a = Math.random() * Math.PI * 2, s = 1.2 + Math.random() * 4;
     particles.push({ x: sx, y: sy, vx: Math.cos(a)*s, vy: Math.sin(a)*s, life: 1, color, r: 1.5+Math.random()*4 });
   }
-  // Spark burst (thin lines)
-  for (let i = 0; i < 6; i++) {
-    const a = (i/6) * Math.PI * 2, s = 3 + Math.random()*5;
-    particles.push({ x: sx, y: sy, vx: Math.cos(a)*s, vy: Math.sin(a)*s, life: 0.7, color:'#fff', r: 0.8 });
+  if (!IS_MOBILE) {
+    // Spark burst only on desktop
+    for (let i = 0; i < 6; i++) {
+      const a = (i/6) * Math.PI * 2, s = 3 + Math.random()*5;
+      particles.push({ x: sx, y: sy, vx: Math.cos(a)*s, vy: Math.sin(a)*s, life: 0.7, color:'#fff', r: 0.8 });
+    }
   }
   // Pixel explosion canvas overlay
   explosionOverlays.push({ x: sx, y: sy, life: 1.0 });
@@ -2008,9 +2396,31 @@ function spawnParticles(bx, by, color, count=14) {
 function updateExplosionOverlays() {
   explosionOverlays = explosionOverlays.filter(e => e.life > 0);
   const eSize = Math.min(W, H) * 0.18;
+
+  if (IS_MOBILE) {
+    // Mobile: simple single arc, no gradients
+    explosionOverlays.forEach(e => {
+      const progress = 1 - e.life;
+      const ringRadius = eSize * 0.5 * progress;
+      if (ringRadius > 0) {
+        ctx.save();
+        ctx.globalAlpha = e.life * 0.7;
+        ctx.strokeStyle = '#ff9900';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, ringRadius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+      e.life -= 0.09;
+    });
+    return;
+  }
+
+  // Desktop: full quality
   explosionOverlays.forEach(e => {
     ctx.save();
-    const progress = 1 - e.life; // 0=start, 1=end
+    const progress = 1 - e.life;
     const numRings = 3;
     for (let r = 0; r < numRings; r++) {
       const ringProgress = Math.max(0, progress * numRings - r);
@@ -2028,7 +2438,6 @@ function updateExplosionOverlays() {
       ctx.beginPath();
       ctx.arc(e.x, e.y, ringRadius, 0, Math.PI * 2);
       ctx.fill();
-      // Bright ring edge
       ctx.globalAlpha = alpha * 0.6;
       ctx.strokeStyle = colors[r % colors.length];
       ctx.lineWidth = 2 + r;
@@ -2038,7 +2447,6 @@ function updateExplosionOverlays() {
       ctx.arc(e.x, e.y, ringRadius * 0.85, 0, Math.PI * 2);
       ctx.stroke();
     }
-    // Bright center flash
     if (e.life > 0.6) {
       const flashAlpha = (e.life - 0.6) / 0.4;
       ctx.globalAlpha = flashAlpha * 0.9;
@@ -2063,13 +2471,19 @@ function renderLoop() {
   const p0y = myIdx===0 ? myPaddleY  : oppPaddleY;
   const p1y = myIdx===0 ? oppPaddleY : myPaddleY;
 
-  drawBallTrail();
+  if (!IS_MOBILE) drawBallTrail();
   drawPaddleRect(-0.9, p0y, true);
+  // Reset shadow after paddle draw to avoid bleed into other draws
+  ctx.shadowBlur = 0;
   drawPaddleRect( 0.9, p1y, false);
+  ctx.shadowBlur = 0;
 
   drawBallRect(ballState.x, ballState.y);
+  ctx.shadowBlur = 0;
   updateParticles();
   updateExplosionOverlays();
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
 }
 
 // ══ INPUT ═════════════════════════════════════════════════════════════════════
@@ -2587,7 +3001,7 @@ function showWin(data) {
   const wn = document.getElementById('win-name');
   wn.textContent = data.winner_name.toUpperCase();
   wn.className   = `p${data.winner_idx}`;
-  document.getElementById('win-turma').textContent = data.winner_turma.toUpperCase();
+  document.getElementById('win-turma').textContent = (data.winner_turma || myTurma || '').toUpperCase();
 
   buildPodium(data.leaderboard || []);
   show('screen-win');
@@ -2600,13 +3014,13 @@ function buildPodium(lb) {
   rest.innerHTML = '';
 
   const top3 = lb.slice(0,3);
-  const order = [1,0,2]; // visual order: 2nd, 1st, 3rd
+  const order = [1,0,2];
   const rankClass = ['rank1','rank2','rank3'];
-  const crowns = ['👑','','🥉'];
 
   order.forEach(i => {
     if(!top3[i]) return;
     const p = top3[i];
+    const turmaTag = p.turma ? `<span style="font-size:8px;letter-spacing:2px;color:#555;font-family:'Share Tech Mono',monospace;display:block;margin-top:2px;">${p.turma}</span>` : '';
     const col = document.createElement('div');
     col.className='podium-col';
     col.innerHTML=`
@@ -2614,13 +3028,14 @@ function buildPodium(lb) {
       <div class="podium-bar ${rankClass[i]}">
         ${i===0?'<div class="podium-crown">👑</div>':''}
         <div class="podium-wins">${p.wins}</div>
-        <div class="podium-name">${p.name.toUpperCase()}<br><span style="color:#444;font-size:9px">${p.turma}</span></div>
+        <div class="podium-name">${p.name.toUpperCase()}${turmaTag}</div>
       </div>`;
     podium.appendChild(col);
   });
 
   lb.slice(3).forEach((p, i) => {
-    rest.innerHTML += `#${i+4} &nbsp; ${p.name.toUpperCase()} &nbsp; <span style="color:#555">${p.turma}</span> &nbsp; ${p.wins} vit<br>`;
+    const turmaStr = p.turma ? ` <span style="color:#444">[${p.turma}]</span>` : '';
+    rest.innerHTML += `<span style="color:#555">#${i+4}</span> &nbsp; ${p.name.toUpperCase()}${turmaStr} &nbsp; <span style="color:#555">${p.wins} vit</span><br>`;
   });
 }
 
@@ -2631,18 +3046,19 @@ function buildPodium(lb) {
   const cv  = document.getElementById('menu-preview-canvas');
   const cx2 = cv.getContext('2d');
   let rafMenu = null;
+  let W2 = 0, H2 = 0;
 
   function resizeMenu() {
-    cv.width  = cv.offsetWidth  || window.innerWidth;
-    cv.height = cv.offsetHeight || window.innerHeight;
+    W2 = cv.width  = cv.offsetWidth  || window.innerWidth;
+    H2 = cv.height = cv.offsetHeight || window.innerHeight;
   }
+  resizeMenu();
+  window.addEventListener('resize', resizeMenu);
 
   let pb = { x:0.5, y:0.5, vx:0.004, vy:0.003 };
   let p0y = 0.5, p1y = 0.5;
 
   function drawMenu() {
-    resizeMenu();
-    const W2 = cv.width, H2 = cv.height;
     cx2.clearRect(0,0,W2,H2);
 
     // Move ball
@@ -2657,22 +3073,17 @@ function buildPodium(lb) {
     if (pb.x > 0.94) { pb.vx = -Math.abs(pb.vx); pb.vy += (Math.random()-0.5)*0.002; }
 
     const pH = 0.15, pW = 0.012;
-    // Paddles
     cx2.fillStyle = '#00eeff';
     cx2.fillRect(W2*0.04, H2*(p0y-pH/2), W2*pW, H2*pH);
     cx2.fillStyle = '#ff4466';
     cx2.fillRect(W2*0.95, H2*(p1y-pH/2), W2*pW, H2*pH);
 
-    // Ball (X image or circle)
+    // Ball
     const br = W2 * 0.022;
-    if (typeof ballImg !== 'undefined' && ballImg.complete && ballImg.naturalWidth > 0) {
-      cx2.drawImage(ballImg, W2*pb.x - br, H2*pb.y - br, br*2, br*2);
-    } else {
-      cx2.fillStyle = '#fff';
-      cx2.beginPath();
-      cx2.arc(W2*pb.x, H2*pb.y, br*0.5, 0, Math.PI*2);
-      cx2.fill();
-    }
+    cx2.fillStyle = '#fff';
+    cx2.beginPath();
+    cx2.arc(W2*pb.x, H2*pb.y, br*0.5, 0, Math.PI*2);
+    cx2.fill();
 
     // Center line
     cx2.fillStyle = 'rgba(255,255,255,0.06)';
@@ -2683,6 +3094,7 @@ function buildPodium(lb) {
   }
 
   window.startMenuPreview = function() {
+    if (rafMenu) cancelAnimationFrame(rafMenu);
     pb = { x:0.5, y:0.5, vx:0.004*(Math.random()<0.5?1:-1), vy:0.0025*(Math.random()<0.5?1:-1) };
     drawMenu();
   };
@@ -3049,14 +3461,18 @@ function joinQueue() {
   stopMenuPreview();
   const name  = document.getElementById('inp-name').value.trim();
   const serie = document.getElementById('inp-serie').value;
-  if (!name || !serie) {
-    if (!name) document.getElementById('inp-name').focus();
-    else document.getElementById('inp-serie').focus();
-    return;
-  }
-  myName = name;
+  const turmaLetra = document.getElementById('inp-turma').value;
+  if (!name)       { document.getElementById('inp-name').focus(); return; }
+  if (!serie)      { document.getElementById('inp-serie').focus(); return; }
+  if (!turmaLetra) { document.getElementById('inp-turma').focus(); return; }
+  // Combine: e.g. "9" + "A" → "9A", "1M" + "B" → "1B" (strip M for display)
+  const turma = serie.replace('M','') + turmaLetra;
+  myName  = name;
+  myTurma = turma;
+  localStorage.setItem('mathpong_serie', serie);
+  localStorage.setItem('mathpong_turma_letra', turmaLetra);
   const lvl = parseInt(localStorage.getItem('mathpong_level') || '7');
-  socket.emit('join_queue', { name, turma: serie, level: lvl });
+  socket.emit('join_queue', { name, turma, serie, level: lvl });
   show('screen-waiting');
   hide('screen-menu');
 }
@@ -3394,22 +3810,24 @@ const LEVEL_DESC = {
 
 let selectedLevel = parseInt(localStorage.getItem('mathpong_level') || '7');
 
-// Restaurar série do localStorage
-const savedSerie = localStorage.getItem('mathpong_serie');
-if (savedSerie) {
-  const sel = document.getElementById('inp-serie');
-  if (sel) sel.value = savedSerie;
-}
-// Salvar série ao mudar
+// Restaurar seleções do localStorage
+const savedSerie      = localStorage.getItem('mathpong_serie');
+const savedTurmaLetra = localStorage.getItem('mathpong_turma_letra');
+if (savedSerie)      { const el = document.getElementById('inp-serie');  if (el) el.value = savedSerie; }
+if (savedTurmaLetra) { const el = document.getElementById('inp-turma');  if (el) el.value = savedTurmaLetra; }
+let myTurma = savedSerie && savedTurmaLetra ? savedSerie.replace('M','') + savedTurmaLetra : '';
+
 document.addEventListener('DOMContentLoaded', () => {
-  const sel = document.getElementById('inp-serie');
-  if (sel) sel.addEventListener('change', () => localStorage.setItem('mathpong_serie', sel.value));
-  // Start menu preview after fonts/images load
   setTimeout(startMenuPreview, 300);
 });
-// Fallback imediato caso já carregou
-const _serSel = document.getElementById('inp-serie');
-if (_serSel) _serSel.addEventListener('change', () => localStorage.setItem('mathpong_serie', _serSel.value));
+const _turmaSelEl = document.getElementById('inp-turma');
+if (_turmaSelEl) _turmaSelEl.addEventListener('change', () => {
+  localStorage.setItem('mathpong_turma_letra', _turmaSelEl.value);
+});
+const _serieSelEl = document.getElementById('inp-serie');
+if (_serieSelEl) _serieSelEl.addEventListener('change', () => {
+  localStorage.setItem('mathpong_serie', _serieSelEl.value);
+});
 
 
 // ══ COMO JOGAR ════════════════════════════════════════════════════════════════
@@ -3625,21 +4043,79 @@ function closeSettings() {
 }
 
 // ══ LEADERBOARD MODAL ════════════════════════════════════════════════════════
+let _lbAllData = [];
+let _lbTurmaFilter = '';
+
 async function showLeaderboard() {
   hide('screen-menu');
   show('screen-leaderboard');
   document.getElementById('lb-podium').innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:11px;color:#222;letter-spacing:3px;">CARREGANDO...</div>';
   document.getElementById('lb-rest').innerHTML = '';
   document.getElementById('lb-empty').style.display = 'none';
+  _lbTurmaFilter = '';
+  renderLbFilter([]);
 
   try {
     const res  = await fetch('/leaderboard');
-    const data = await res.json();
-    buildLbPodium(data);
+    _lbAllData = await res.json();
+    // Extract unique turmas
+    const turmas = [...new Set(_lbAllData.map(p => p.turma).filter(Boolean))].sort();
+    renderLbFilter(turmas);
+    buildLbPodium(_lbAllData);
   } catch(e) {
     document.getElementById('lb-podium').innerHTML = '';
     document.getElementById('lb-empty').style.display = 'block';
   }
+}
+
+function renderLbFilter(turmas) {
+  let filterEl = document.getElementById('lb-turma-filter');
+  if (!filterEl) {
+    filterEl = document.createElement('div');
+    filterEl.id = 'lb-turma-filter';
+    filterEl.style.cssText = `
+      display:flex; flex-wrap:wrap; gap:6px; justify-content:center;
+      margin-bottom:16px; width:min(400px,92vw); flex-shrink:0;
+    `;
+    const podium = document.getElementById('lb-podium');
+    podium.parentNode.insertBefore(filterEl, podium);
+  }
+  filterEl.innerHTML = '';
+  if (!turmas.length) return;
+
+  const allBtn = document.createElement('button');
+  allBtn.textContent = 'TODAS';
+  allBtn.style.cssText = `font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;
+    padding:5px 12px;border-radius:20px;cursor:pointer;transition:all .15s;min-height:30px;
+    border:1px solid rgba(0,238,255,0.3);background:rgba(0,238,255,0.12);color:var(--cyan);touch-action:manipulation;`;
+  allBtn.onclick = () => { _lbTurmaFilter = ''; renderLbActive(filterEl); buildLbPodium(_lbAllData); };
+  filterEl.appendChild(allBtn);
+
+  turmas.forEach(t => {
+    const btn = document.createElement('button');
+    btn.textContent = t;
+    btn.dataset.turma = t;
+    btn.style.cssText = `font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;
+      padding:5px 12px;border-radius:20px;cursor:pointer;transition:all .15s;min-height:30px;
+      border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);color:#555;touch-action:manipulation;`;
+    btn.onclick = () => {
+      _lbTurmaFilter = t;
+      renderLbActive(filterEl);
+      const filtered = _lbAllData.filter(p => p.turma === t);
+      buildLbPodium(filtered);
+    };
+    filterEl.appendChild(btn);
+  });
+  renderLbActive(filterEl);
+}
+
+function renderLbActive(filterEl) {
+  filterEl.querySelectorAll('button').forEach(b => {
+    const active = (b.dataset.turma === _lbTurmaFilter) || (!b.dataset.turma && !_lbTurmaFilter);
+    b.style.background = active ? 'rgba(0,238,255,0.12)' : 'rgba(255,255,255,0.03)';
+    b.style.borderColor = active ? 'rgba(0,238,255,0.4)' : 'rgba(255,255,255,0.1)';
+    b.style.color = active ? 'var(--cyan)' : '#555';
+  });
 }
 
 function buildLbPodium(lb) {
@@ -3652,9 +4128,10 @@ function buildLbPodium(lb) {
     document.getElementById('lb-empty').style.display = 'block';
     return;
   }
+  document.getElementById('lb-empty').style.display = 'none';
 
   const top3  = lb.slice(0, 3);
-  const order = [1, 0, 2]; // visual: silver, gold, bronze
+  const order = [1, 0, 2];
   const bars  = ['lb-bar-2', 'lb-bar-1', 'lb-bar-3'];
   const crowns = ['', '👑', ''];
   const ranks  = ['#2', '#1', '#3'];
@@ -3662,7 +4139,8 @@ function buildLbPodium(lb) {
   order.forEach(i => {
     if (!top3[i]) return;
     const p   = top3[i];
-    const vi  = order.indexOf(i); // visual position index
+    const vi  = order.indexOf(i);
+    const turmaTag = p.turma ? `<span style="color:#333;font-size:8px;letter-spacing:1px;display:block;margin-top:2px;">${p.turma}</span>` : '';
     const col = document.createElement('div');
     col.className = 'lb-podium-col';
     col.innerHTML = `
@@ -3670,16 +4148,16 @@ function buildLbPodium(lb) {
       <div class="lb-podium-bar ${bars[vi]}">
         ${crowns[vi] ? `<div class="lb-podium-crown">${crowns[vi]}</div>` : ''}
         <div class="lb-podium-wins">${p.wins}</div>
-        <div class="lb-podium-name">${p.name.toUpperCase()}<br>
-          <span style="color:#333;font-size:8px;">${p.turma || ''}</span>
-        </div>
+        <div class="lb-podium-name">${p.name.toUpperCase()}${turmaTag}</div>
       </div>`;
     podium.appendChild(col);
   });
 
   lb.slice(3).forEach((p, i) => {
+    const turmaStr = p.turma ? ` <span style="color:#333;font-size:9px;">[${p.turma}]</span>` : '';
     const row = document.createElement('div');
-    row.innerHTML = `<span style="color:#333">#${i+4}</span> &nbsp; ${p.name.toUpperCase()} &nbsp; <span style="color:#222">${p.turma || ''}</span> &nbsp; <span style="color:#555">${p.wins} vit</span>`;
+    row.style.cssText = 'padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.03);';
+    row.innerHTML = `<span style="color:#333">#${i+4}</span> &nbsp; ${p.name.toUpperCase()}${turmaStr} &nbsp; <span style="color:#555">${p.wins} vit</span>`;
     rest.appendChild(row);
   });
 }
@@ -3687,6 +4165,7 @@ function buildLbPodium(lb) {
 function closeLeaderboard() {
   hide('screen-leaderboard');
   show('screen-menu');
+  startMenuPreview();
 }
 
 // joinQueue already sends level (defined above)
