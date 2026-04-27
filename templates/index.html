@@ -1148,7 +1148,30 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
 /* Glitch wrapper */
 #intro-glitch-wrap { position:relative; }
 
-/* Ghost glitch layer - see #intro-logo above */
+#intro-logo {
+  font-size: clamp(28px, 10vw, 96px);
+  font-weight:900;
+  letter-spacing: clamp(2px, 1.5vw, 8px);
+  line-height:1; text-align:center;
+  white-space: nowrap;
+  filter: drop-shadow(0 0 30px rgba(0,238,255,0.4));
+  animation: logoBreathe 2s 1.2s ease-in-out infinite;
+}
+#intro-logo-ghost {
+  position:absolute; inset:0;
+  font-family:'Orbitron',sans-serif;
+  font-size: clamp(28px, 10vw, 96px);
+  font-weight:900;
+  letter-spacing: clamp(2px, 1.5vw, 8px);
+  color: #ff4466;
+  opacity:0;
+  line-height:1; text-align:center;
+  white-space: nowrap;
+  pointer-events:none;
+  animation: ghostGlitch 2.5s .7s ease-in-out infinite;
+  clip-path: polygon(0 20%, 100% 20%, 100% 40%, 0 40%);
+  mix-blend-mode: screen;
+}
 @keyframes ghostGlitch {
   0%,89%,100% { opacity:0; transform:translate(0,0); }
   90%   { opacity:0.7; transform:translate(-4px, 2px); }
@@ -1163,38 +1186,17 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
   background: linear-gradient(135deg, #00eeff 0%, #fff 45%, #ff4466 100%);
   -webkit-background-clip: text; -webkit-text-fill-color: transparent;
   background-clip: text;
-  font-size: clamp(36px, 12vw, 96px);
+  font-size: inherit;
   animation: letterDrop .55s cubic-bezier(0.34,1.56,0.64,1) forwards;
 }
 @keyframes letterDrop {
   from { opacity:0; transform: translateY(-70px) scale(1.4) rotate(-18deg); filter:blur(4px); }
   to   { opacity:1; transform: translateY(0) scale(1) rotate(0deg); filter:blur(0); }
 }
-#intro-logo {
-  font-size: clamp(36px, 12vw, 96px);
-  font-weight:900; letter-spacing:clamp(4px,2vw,8px);
-  line-height:1; text-align:center;
-  filter: drop-shadow(0 0 30px rgba(0,238,255,0.4));
-  animation: logoBreathe 2s 1.2s ease-in-out infinite;
-}
-#intro-logo-ghost {
-  position:absolute; inset:0;
-  font-family:'Orbitron',sans-serif;
-  font-size: clamp(36px, 12vw, 96px);
-  font-weight:900; letter-spacing:clamp(4px,2vw,8px);
-  color: #ff4466;
-  opacity:0;
-  line-height:1; text-align:center;
-  pointer-events:none;
-  animation: ghostGlitch 2.5s .7s ease-in-out infinite;
-  clip-path: polygon(0 20%, 100% 20%, 100% 40%, 0 40%);
-  mix-blend-mode: screen;
-}
 @keyframes logoBreathe {
   0%,100% { filter: drop-shadow(0 0 20px rgba(0,238,255,0.35)); }
   50%      { filter: drop-shadow(0 0 60px rgba(0,238,255,0.7)) drop-shadow(0 0 100px rgba(255,68,102,0.3)); }
 }
-#intro-sub {
   font-family:'Share Tech Mono',monospace;
   font-size:clamp(8px,2.2vw,12px); letter-spacing:clamp(3px,1.5vw,6px);
   color:#ffcc00; opacity:0;
@@ -1486,9 +1488,7 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
   <div id="intro-content">
     <div id="intro-glitch-wrap">
       <div id="intro-logo">
-        <span class="intro-letter" style="animation-delay:.05s">M</span><span class="intro-letter" style="animation-delay:.12s">A</span><span class="intro-letter" style="animation-delay:.19s">T</span><span class="intro-letter" style="animation-delay:.26s">H</span>
-        <span class="intro-letter" style="animation-delay:.38s;margin:0 12px"> </span>
-        <span class="intro-letter" style="animation-delay:.44s">P</span><span class="intro-letter" style="animation-delay:.51s">O</span><span class="intro-letter" style="animation-delay:.58s">N</span><span class="intro-letter" style="animation-delay:.65s">G</span>
+        <span class="intro-letter" style="animation-delay:.05s">M</span><span class="intro-letter" style="animation-delay:.12s">A</span><span class="intro-letter" style="animation-delay:.19s">T</span><span class="intro-letter" style="animation-delay:.26s">H</span><span class="intro-letter" style="animation-delay:.33s;display:inline-block;width:clamp(8px,2vw,20px);"> </span><span class="intro-letter" style="animation-delay:.44s">P</span><span class="intro-letter" style="animation-delay:.51s">O</span><span class="intro-letter" style="animation-delay:.58s">N</span><span class="intro-letter" style="animation-delay:.65s">G</span>
       </div>
       <div id="intro-logo-ghost" aria-hidden="true">MATH PONG</div>
     </div>
