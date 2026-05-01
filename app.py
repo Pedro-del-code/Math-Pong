@@ -684,6 +684,10 @@ class GameRoom:
 
 # ── HTTP ROUTES ───────────────────────────────────────────────────────────────
 @app.route('/')
+def splash():
+    return render_template('splash.html')
+
+@app.route('/menu')
 def index():
     return render_template('index.html')
 
