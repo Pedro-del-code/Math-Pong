@@ -31,7 +31,7 @@
 @media (max-width: 480px) {
   #scanlines { display: none; }
   :root { --hud-h: 54px; }
-  .menu-logo { font-size: clamp(46px, 18vw, 68px) !important; letter-spacing: 4px !important; }
+  .menu-logo { font-size: clamp(42px, 14vw, 64px) !important; letter-spacing: 3px !important; }
   .input-group { width: min(320px, 92vw) !important; gap: 8px !important; }
   .btn-primary { font-size: 11px !important; letter-spacing: 2px !important; padding: 14px 28px !important; }
   .btn-secondary { font-size: 10px !important; padding: 12px 20px !important; letter-spacing: 2px !important; }
@@ -291,74 +291,87 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
   background: #000408;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding-top: max(20px, env(safe-area-inset-top, 20px));
-  padding-bottom: max(24px, env(safe-area-inset-bottom, 24px));
+  padding-top: max(16px, env(safe-area-inset-top, 16px));
+  padding-bottom: max(20px, env(safe-area-inset-bottom, 20px));
   gap: 0;
   justify-content: flex-start;
   align-items: center;
 }
-/* Animated background */
 #screen-menu::before {
   content:'';
   position:absolute; inset:0; z-index:0; pointer-events:none;
   background:
-    radial-gradient(ellipse 70% 45% at 15% 20%, rgba(0,238,255,0.09) 0%, transparent 70%),
-    radial-gradient(ellipse 55% 65% at 85% 75%, rgba(255,68,102,0.08) 0%, transparent 70%),
-    radial-gradient(ellipse 50% 50% at 50% 50%, rgba(255,204,0,0.03) 0%, transparent 70%);
-  animation: blobShift 10s ease-in-out infinite alternate;
+    radial-gradient(ellipse 70% 40% at 15% 15%, rgba(0,238,255,0.08) 0%, transparent 65%),
+    radial-gradient(ellipse 55% 55% at 85% 80%, rgba(255,68,102,0.07) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 50% at 50% 50%, rgba(255,204,0,0.025) 0%, transparent 65%);
+  animation: blobShift 12s ease-in-out infinite alternate;
 }
-@keyframes blobShift {
-  0%   { opacity:.8; }
-  100% { opacity:1; }
-}
-/* Grid */
+@keyframes blobShift { 0%{opacity:.7} 100%{opacity:1} }
 #screen-menu::after {
   content:'';
   position:absolute; inset:0; z-index:0; pointer-events:none;
   background-image:
-    linear-gradient(rgba(0,238,255,0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,238,255,0.02) 1px, transparent 1px);
+    linear-gradient(rgba(0,238,255,0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,238,255,0.018) 1px, transparent 1px);
   background-size: 44px 44px;
   animation: gridMove 20s linear infinite;
 }
 
-/* ── LOGO HEADER AREA ── */
+/* ── MENU HEADER ── */
 #menu-header {
   position: relative; z-index: 1;
   display: flex; flex-direction: column;
   align-items: center;
   width: 100%;
-  padding: 10px 0 0;
+  padding: 8px 16px 0;
   flex-shrink: 0;
+  /* Neon horizontal line accent */
+}
+#menu-header::after {
+  content:'';
+  display:block;
+  width: min(220px,60vw);
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,238,255,0.5), rgba(255,68,102,0.4), transparent);
+  margin: 10px auto 0;
+  border-radius:1px;
+}
+
+/* ── PARTICLE DOTS DECORATION ── */
+#menu-dots {
+  position:absolute; inset:0; z-index:0; pointer-events:none; overflow:hidden;
 }
 
 .menu-logo {
-  font-size: clamp(52px, 18vw, 88px);
+  font-size: clamp(42px, 15vw, 80px);
   font-weight: 900;
   background: linear-gradient(160deg, var(--cyan) 0%, #ffffff 40%, var(--red) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  letter-spacing: 6px;
+  letter-spacing: clamp(3px,1.5vw,8px);
   animation: logoPulse 3s ease-in-out infinite;
   text-align: center;
-  line-height: 0.92;
+  line-height: 0.9;
   position: relative; z-index: 1;
+  /* Prevent any overflow clipping */
+  padding: 0 4px;
+  width: 100%;
 }
 @keyframes logoPulse {
-  0%,100% { filter: drop-shadow(0 0 12px rgba(0,238,255,0.45)); }
-  50%      { filter: drop-shadow(0 0 32px rgba(0,238,255,0.8)) drop-shadow(0 0 60px rgba(255,68,102,0.25)); }
+  0%,100% { filter: drop-shadow(0 0 10px rgba(0,238,255,0.4)); }
+  50%      { filter: drop-shadow(0 0 28px rgba(0,238,255,0.75)) drop-shadow(0 0 50px rgba(255,68,102,0.22)); }
 }
 
 .menu-badge {
   font-family: 'Share Tech Mono', monospace;
-  font-size: clamp(8px, 2vw, 10px);
+  font-size: clamp(7px, 1.8vw, 10px);
   letter-spacing: 4px;
   color: var(--gold);
   background: rgba(255,204,0,0.07);
   border: 1px solid rgba(255,204,0,0.22);
   border-radius: 20px;
-  padding: 5px 16px;
+  padding: 5px 14px;
   text-shadow: 0 0 14px var(--gold);
   position: relative; z-index: 1;
   margin-top: 8px;
@@ -379,34 +392,55 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
   background: rgba(255,255,255,0.025);
   border: 1px solid rgba(255,255,255,0.07);
   border-radius: 20px;
-  padding: 22px 20px 20px;
+  padding: 20px 18px 18px;
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   box-shadow:
-    0 0 0 1px rgba(0,238,255,0.05),
-    0 20px 60px rgba(0,0,0,0.55),
+    0 0 0 1px rgba(0,238,255,0.04),
+    0 20px 60px rgba(0,0,0,0.5),
     inset 0 1px 0 rgba(255,255,255,0.05);
   display: flex;
   flex-direction: column;
-  gap: 9px;
-  margin-top: 16px;
+  gap: 8px;
+  margin-top: 14px;
   flex-shrink: 0;
 }
+/* Top glow line */
 .menu-card::before {
   content:'';
   position: absolute; top: 0; left: 50%; transform: translateX(-50%);
-  width: 35%; height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(0,238,255,0.45), transparent);
+  width: 40%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,238,255,0.5), transparent);
+}
+/* Corner accent TL */
+.menu-card::after {
+  content:'';
+  position: absolute; top: -1px; left: -1px;
+  width: 22px; height: 22px;
+  border-top: 2px solid rgba(0,238,255,0.4);
+  border-left: 2px solid rgba(0,238,255,0.4);
+  border-radius: 20px 0 0 0;
+  pointer-events: none;
+}
+
+/* Corner accent BR using extra element via JS */
+#menu-corner-br {
+  position: absolute; bottom: -1px; right: -1px;
+  width: 22px; height: 22px;
+  border-bottom: 2px solid rgba(255,68,102,0.35);
+  border-right: 2px solid rgba(255,68,102,0.35);
+  border-radius: 0 0 20px 0;
+  pointer-events: none;
 }
 
 /* ── DIVIDER ── */
 .menu-divider {
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
-  margin: 3px 0;
+  margin: 2px 0;
 }
 
-/* ── SECONDARY BUTTONS ROW ── */
+/* ── SECONDARY ACTIONS ── */
 .menu-actions-row {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
@@ -414,50 +448,61 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
 }
 .btn-action {
   font-family: 'Orbitron', sans-serif;
-  font-size: clamp(7px, 2vw, 9px);
+  font-size: clamp(7px, 1.8vw, 9px);
   font-weight: 700;
   letter-spacing: 1px;
-  padding: 13px 4px;
+  padding: 12px 4px;
   background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.07);
   border-radius: 12px;
-  color: rgba(255,255,255,0.35);
+  color: rgba(255,255,255,0.3);
   cursor: pointer;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
-  transition: all .2s;
+  transition: all .18s;
   display: flex; flex-direction: column;
-  align-items: center; gap: 4px;
+  align-items: center; gap: 5px;
 }
-.btn-action .btn-icon { font-size: 16px; line-height: 1; }
+.btn-action .btn-icon { font-size: 18px; line-height: 1; }
 .btn-action:active {
   background: rgba(255,255,255,0.07);
-  color: rgba(255,255,255,0.6);
-  transform: scale(0.96);
+  color: rgba(255,255,255,0.55);
+  transform: scale(0.95);
 }
 
 /* ── SKINS BTN ── */
 .btn-skins {
   font-family: 'Orbitron', sans-serif;
-  font-size: clamp(9px, 2.2vw, 11px);
+  font-size: clamp(8px, 2vw, 10px);
   font-weight: 700;
   letter-spacing: 2px;
   padding: 13px;
-  background: rgba(200,100,255,0.05);
-  border: 1px solid rgba(200,100,255,0.18);
+  background: rgba(180,80,255,0.05);
+  border: 1px solid rgba(180,80,255,0.18);
   border-radius: 12px;
-  color: rgba(200,100,255,0.55);
+  color: rgba(180,80,255,0.5);
   cursor: pointer;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
-  transition: all .2s;
+  transition: all .18s;
   width: 100%;
   display: flex; align-items: center; justify-content: center; gap: 8px;
 }
 .btn-skins:active {
-  background: rgba(200,100,255,0.1);
+  background: rgba(180,80,255,0.1);
   color: rgba(200,100,255,0.8);
   transform: scale(0.98);
+}
+
+/* ── MENU VERSION STAMP ── */
+#menu-version {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 3px;
+  color: rgba(255,255,255,0.08);
+  position: relative; z-index: 1;
+  margin-top: 10px;
+  flex-shrink: 0;
 }
 
 .input-group {
@@ -1189,126 +1234,6 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
   z-index:0;
 }
 
-/* ── LOGO INTRO ANIMATION ── */
-#intro-overlay {
-  position:fixed; inset:0; z-index:9999;
-  background: #000;
-  display:flex; align-items:center; justify-content:center;
-  overflow:hidden;
-  padding: env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0);
-}
-#intro-overlay.fade-out {
-  animation: introFade .9s .1s ease forwards;
-}
-@keyframes introFade { to { opacity:0; pointer-events:none; } }
-
-/* Particles canvas inside intro */
-#intro-particles {
-  position:absolute; inset:0; width:100%; height:100%;
-  pointer-events:none; z-index:1;
-}
-
-/* Content container */
-#intro-content {
-  display:flex; flex-direction:column; align-items:center;
-  gap: clamp(8px, 2.5vh, 20px);
-  position:relative; z-index:10;
-  padding: 0 16px;
-  max-width: 100vw;
-}
-
-/* Glitch wrapper */
-#intro-glitch-wrap { position:relative; }
-
-#intro-logo {
-  font-size: clamp(28px, 10vw, 96px);
-  font-weight:900;
-  letter-spacing: clamp(2px, 1.5vw, 8px);
-  line-height:1; text-align:center;
-  white-space: nowrap;
-  filter: drop-shadow(0 0 30px rgba(0,238,255,0.4));
-  animation: logoBreathe 2s 1.2s ease-in-out infinite;
-}
-#intro-logo-ghost {
-  position:absolute; inset:0;
-  font-family:'Orbitron',sans-serif;
-  font-size: clamp(28px, 10vw, 96px);
-  font-weight:900;
-  letter-spacing: clamp(2px, 1.5vw, 8px);
-  color: #ff4466;
-  opacity:0;
-  line-height:1; text-align:center;
-  white-space: nowrap;
-  pointer-events:none;
-  animation: ghostGlitch 2.5s .7s ease-in-out infinite;
-  clip-path: polygon(0 20%, 100% 20%, 100% 40%, 0 40%);
-  mix-blend-mode: screen;
-}
-@keyframes ghostGlitch {
-  0%,89%,100% { opacity:0; transform:translate(0,0); }
-  90%   { opacity:0.7; transform:translate(-4px, 2px); }
-  92%   { opacity:0; }
-  94%   { opacity:0.5; transform:translate(4px, -2px); }
-  96%   { opacity:0; }
-}
-
-.intro-letter {
-  display:inline-block;
-  opacity:0;
-  background: linear-gradient(135deg, #00eeff 0%, #fff 45%, #ff4466 100%);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  background-clip: text;
-  font-size: inherit;
-  animation: letterDrop .55s cubic-bezier(0.34,1.56,0.64,1) forwards;
-}
-@keyframes letterDrop {
-  from { opacity:0; transform: translateY(-70px) scale(1.4) rotate(-18deg); filter:blur(4px); }
-  to   { opacity:1; transform: translateY(0) scale(1) rotate(0deg); filter:blur(0); }
-}
-@keyframes logoBreathe {
-  0%,100% { filter: drop-shadow(0 0 20px rgba(0,238,255,0.35)); }
-  50%      { filter: drop-shadow(0 0 60px rgba(0,238,255,0.7)) drop-shadow(0 0 100px rgba(255,68,102,0.3)); }
-}
-  font-family:'Share Tech Mono',monospace;
-  font-size:clamp(8px,2.2vw,12px); letter-spacing:clamp(3px,1.5vw,6px);
-  color:#ffcc00; opacity:0;
-  animation: introSubIn .6s 1s ease forwards;
-  text-shadow: 0 0 20px rgba(255,204,0,0.8);
-  text-align:center;
-}
-@keyframes introSubIn { to { opacity:1; } }
-#intro-tagline {
-  font-family:'Share Tech Mono',monospace;
-  font-size:clamp(7px,1.8vw,10px); letter-spacing:clamp(4px,2vw,8px);
-  color: rgba(255,255,255,0.15);
-  opacity:0;
-  animation: introSubIn .5s 1.4s ease forwards;
-  text-align:center;
-}
-#intro-bar {
-  width:0; height:2px;
-  background: linear-gradient(90deg, #00eeff, #ffcc00, #ff4466);
-  border-radius:2px;
-  box-shadow: 0 0 16px rgba(0,238,255,0.7), 0 0 40px rgba(0,238,255,0.3);
-  animation: introBar 1.1s .35s cubic-bezier(0.16,1,0.3,1) forwards;
-  max-width: 90vw;
-}
-@keyframes introBar { to { width: clamp(160px,70vw,420px); } }
-
-/* Light sweep across screen */
-#intro-sweep {
-  position:absolute; top:0; bottom:0;
-  width: 80px;
-  background: linear-gradient(90deg, transparent, rgba(0,238,255,0.06), transparent);
-  pointer-events:none; z-index:3;
-  animation: sweepAcross 1.4s .4s ease-in-out forwards;
-  left: -80px;
-}
-@keyframes sweepAcross {
-  from { left:-80px; }
-  to   { left:110%; }
-}
-
 /* ── STATUS DE EFEITO ATIVO ── */
 #effect-status {
   position:fixed; top:calc(var(--hud-h,62px) + 8px); right:max(12px, env(safe-area-inset-right, 12px));
@@ -1386,7 +1311,7 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
   padding-bottom:6px; margin-bottom:12px;
   font-family:'Share Tech Mono',monospace;
 }
-.skin-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+.skin-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
 .skin-btn {
   display:flex; flex-direction:column; align-items:center; gap:6px;
   background: rgba(255,255,255,0.03);
@@ -1554,23 +1479,6 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
 <body>
 
 
-<!-- ══ INTRO ANIMADO ═════════════════════════════════════════════════════════ -->
-<div id="intro-overlay">
-  <canvas id="intro-particles"></canvas>
-  <div id="intro-content">
-    <div id="intro-glitch-wrap">
-      <div id="intro-logo">
-        <span class="intro-letter" style="animation-delay:.05s">M</span><span class="intro-letter" style="animation-delay:.12s">A</span><span class="intro-letter" style="animation-delay:.19s">T</span><span class="intro-letter" style="animation-delay:.26s">H</span><span class="intro-letter" style="animation-delay:.33s;display:inline-block;width:clamp(8px,2vw,20px);"> </span><span class="intro-letter" style="animation-delay:.44s">P</span><span class="intro-letter" style="animation-delay:.51s">O</span><span class="intro-letter" style="animation-delay:.58s">N</span><span class="intro-letter" style="animation-delay:.65s">G</span>
-      </div>
-      <div id="intro-logo-ghost" aria-hidden="true">MATH PONG</div>
-    </div>
-    <div id="intro-bar"></div>
-    <div id="intro-sub">⚡ DESAFIO MATEMÁTICO MULTIPLAYER ⚡</div>
-    <div id="intro-tagline">PREPARE-SE</div>
-  </div>
-  <div id="intro-sweep"></div>
-</div>
-
 <canvas id="c"></canvas>
 <!-- ══ STATUS DE EFEITOS ════════════════════════════════════════════════════ -->
 <div id="effect-status"></div>
@@ -1591,6 +1499,7 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
 <!-- ══ MENU ══════════════════════════════════════════════════════════════════ -->
 <div id="screen-menu" class="screen">
   <canvas id="menu-preview-canvas"></canvas>
+  <div id="menu-dots"></div>
 
   <!-- LOGO -->
   <div id="menu-header">
@@ -1600,6 +1509,7 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
 
   <!-- CARD -->
   <div class="menu-card">
+    <div id="menu-corner-br"></div>
 
     <!-- INPUTS -->
     <div class="input-group">
@@ -1637,11 +1547,11 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
 
     <!-- MAIN BUTTONS -->
     <button class="btn-primary" onclick="SFX.menuBoop();joinQueue()"><span>▶ JOGAR AGORA</span></button>
-    <button class="btn-primary" onclick="SFX.menuBoop();startAIGame()" style="background:linear-gradient(135deg,rgba(0,255,136,0.12),rgba(0,200,100,0.06));border-color:rgba(0,255,136,0.35);color:var(--green);text-shadow:0 0 12px rgba(0,255,136,0.5);">🤖 TREINAR CONTRA IA</button>
+    <button class="btn-primary" onclick="SFX.menuBoop();startAIGame()" style="background:linear-gradient(135deg,rgba(0,255,136,0.1),rgba(0,180,100,0.06));border-color:rgba(0,255,136,0.32);color:var(--green);text-shadow:0 0 10px rgba(0,255,136,0.5);">🤖 TREINAR CONTRA IA</button>
 
     <div class="menu-divider"></div>
 
-    <!-- SECONDARY ACTIONS -->
+    <!-- SECONDARY -->
     <div class="menu-actions-row">
       <button class="btn-action" onclick="showSettings()">
         <span class="btn-icon">⚙️</span>CONFIG
@@ -1654,11 +1564,10 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
       </button>
     </div>
 
-    <button class="btn-skins" onclick="showSkins()">
-      🎨 &nbsp;PERSONALIZAR SKINS
-    </button>
-
+    <button class="btn-skins" onclick="showSkins()">🎨 &nbsp;PERSONALIZAR SKINS</button>
   </div>
+
+  <div id="menu-version">MATH PONG v1.0 &nbsp;•&nbsp; MULTIPLAYER</div>
 </div>
 
 <!-- ══ WAITING ════════════════════════════════════════════════════════════════ -->
@@ -1746,71 +1655,6 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
 
 <script>
 
-
-// ══ INTRO ════════════════════════════════════════════════════════════════════
-(function() {
-  const overlay = document.getElementById('intro-overlay');
-  if (!overlay) return;
-
-  // ── Particle system ──────────────────────────────────────────────────────
-  const pc = document.getElementById('intro-particles');
-  const pctx = pc.getContext('2d');
-  let pts = [];
-  let pRaf;
-
-  function resizePC() { pc.width = window.innerWidth; pc.height = window.innerHeight; }
-  resizePC();
-  window.addEventListener('resize', resizePC);
-
-  const COLORS_P = ['#00eeff','#ff4466','#ffcc00','#00ff88','#ffffff'];
-  function spawnParticle() {
-    const cx = pc.width / 2, cy = pc.height / 2;
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 0.5 + Math.random() * 2.5;
-    pts.push({
-      x: cx + (Math.random()-0.5)*80,
-      y: cy + (Math.random()-0.5)*40,
-      vx: Math.cos(angle)*speed,
-      vy: Math.sin(angle)*speed - 1,
-      alpha: 1,
-      size: 1 + Math.random()*3,
-      color: COLORS_P[Math.floor(Math.random()*COLORS_P.length)],
-      decay: 0.012 + Math.random()*0.018,
-    });
-  }
-
-  let spawnCount = 0;
-  function introParticleLoop() {
-    pctx.clearRect(0,0,pc.width,pc.height);
-    if (spawnCount < 80) { spawnParticle(); spawnCount++; }
-    pts = pts.filter(p => p.alpha > 0);
-    pts.forEach(p => {
-      p.x += p.vx; p.y += p.vy;
-      p.vy += 0.06; p.vx *= 0.99;
-      p.alpha -= p.decay;
-      pctx.globalAlpha = Math.max(0, p.alpha);
-      pctx.fillStyle = p.color;
-      pctx.shadowColor = p.color;
-      pctx.shadowBlur = 6;
-      pctx.beginPath();
-      pctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
-      pctx.fill();
-    });
-    pctx.globalAlpha = 1;
-    pctx.shadowBlur = 0;
-    pRaf = requestAnimationFrame(introParticleLoop);
-  }
-  introParticleLoop();
-
-  // ── Dismiss ──────────────────────────────────────────────────────────────
-  setTimeout(() => {
-    overlay.classList.add('fade-out');
-    setTimeout(() => {
-      cancelAnimationFrame(pRaf);
-      overlay.remove();
-    }, 1000);
-  }, 2400);
-})();
 
 // ══ SISTEMA DE ÁUDIO (Web Audio API) ════════════════════════════════════════
 let _audioCtx = null;
@@ -3955,16 +3799,24 @@ function closeHowto() {
 
 // ══ SKINS ═════════════════════════════════════════════════════════════════════
 const BALL_SKINS = [
-  { id:'xmark',   label:'X MARK',  draw: drawBallPreview_xmark  },
-  { id:'circle',  label:'BOLA',    draw: drawBallPreview_circle  },
-  { id:'star',    label:'ESTRELA', draw: drawBallPreview_star    },
-  { id:'diamond', label:'DIAMANTE',draw: drawBallPreview_diamond },
+  { id:'xmark',   label:'X MARK',   draw: drawBallPreview_xmark   },
+  { id:'circle',  label:'BOLA',     draw: drawBallPreview_circle   },
+  { id:'star',    label:'ESTRELA',  draw: drawBallPreview_star     },
+  { id:'diamond', label:'DIAMANTE', draw: drawBallPreview_diamond  },
+  { id:'fire',    label:'FOGO',     draw: drawBallPreview_fire     },
+  { id:'atom',    label:'ÁTOMO',    draw: drawBallPreview_atom     },
+  { id:'skull',   label:'CAVEIRA',  draw: drawBallPreview_skull    },
+  { id:'pi',      label:'PI (π)',   draw: drawBallPreview_pi       },
 ];
 const PADDLE_SKINS = [
-  { id:'pencil',  label:'LÁPIS',   draw: drawPaddlePreview_pencil  },
-  { id:'classic', label:'CLÁSSICA',draw: drawPaddlePreview_classic  },
-  { id:'sword',   label:'ESPADA',  draw: drawPaddlePreview_sword    },
-  { id:'wand',    label:'VARINHA', draw: drawPaddlePreview_wand     },
+  { id:'pencil',  label:'LÁPIS',    draw: drawPaddlePreview_pencil   },
+  { id:'classic', label:'CLÁSSICA', draw: drawPaddlePreview_classic  },
+  { id:'sword',   label:'ESPADA',   draw: drawPaddlePreview_sword    },
+  { id:'wand',    label:'VARINHA',  draw: drawPaddlePreview_wand     },
+  { id:'laser',   label:'LASER',    draw: drawPaddlePreview_laser    },
+  { id:'neon',    label:'NEON',     draw: drawPaddlePreview_neon     },
+  { id:'ruler',   label:'RÉGUA',    draw: drawPaddlePreview_ruler    },
+  { id:'bolt',    label:'RELÂMPO',  draw: drawPaddlePreview_bolt     },
 ];
 
 function drawBallPreview_xmark(c) {
@@ -4073,7 +3925,138 @@ function drawPaddlePreview_wand(c) {
   ctx2.restore();
 }
 
-function buildSkinGrid(gridId, skins, currentId, onSelect) {
+function drawBallPreview_fire(c) {
+  const ctx2=c.getContext('2d'); const s=c.width;
+  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s/2,s/2);
+  // outer glow
+  ctx2.shadowColor='#ff6600'; ctx2.shadowBlur=14;
+  // flame body
+  const g=ctx2.createRadialGradient(0,s*0.1,s*0.05,0,0,s*0.38);
+  g.addColorStop(0,'#fff'); g.addColorStop(0.25,'#ffee00'); g.addColorStop(0.6,'#ff6600'); g.addColorStop(1,'rgba(255,40,0,0)');
+  ctx2.fillStyle=g;
+  ctx2.beginPath();
+  ctx2.moveTo(0,-s*0.38);
+  ctx2.bezierCurveTo(s*0.22,-s*0.2, s*0.28,s*0.1, 0,s*0.38);
+  ctx2.bezierCurveTo(-s*0.28,s*0.1, -s*0.22,-s*0.2, 0,-s*0.38);
+  ctx2.fill();
+  ctx2.restore();
+}
+function drawBallPreview_atom(c) {
+  const ctx2=c.getContext('2d'); const s=c.width;
+  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s/2,s/2);
+  ctx2.shadowColor='#00ff88'; ctx2.shadowBlur=10;
+  ctx2.strokeStyle='rgba(0,255,136,0.7)'; ctx2.lineWidth=s*0.07;
+  // 3 orbits
+  for(let i=0;i<3;i++){
+    ctx2.save(); ctx2.rotate(i*Math.PI/3);
+    ctx2.beginPath(); ctx2.ellipse(0,0,s*0.38,s*0.16,0,0,Math.PI*2); ctx2.stroke();
+    ctx2.restore();
+  }
+  // nucleus
+  ctx2.shadowBlur=16; ctx2.fillStyle='#00ff88';
+  ctx2.beginPath(); ctx2.arc(0,0,s*0.1,0,Math.PI*2); ctx2.fill();
+  ctx2.restore();
+}
+function drawBallPreview_skull(c) {
+  const ctx2=c.getContext('2d'); const s=c.width;
+  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s/2,s/2);
+  ctx2.shadowColor='#aaaaff'; ctx2.shadowBlur=10;
+  ctx2.fillStyle='rgba(180,180,220,0.9)';
+  // cranium
+  ctx2.beginPath(); ctx2.arc(0,-s*0.06,s*0.3,Math.PI,0); ctx2.closePath(); ctx2.fill();
+  // jaw
+  ctx2.fillRect(-s*0.2,s*0.05,s*0.4,s*0.16);
+  // eyes
+  ctx2.fillStyle='#000212';
+  ctx2.beginPath(); ctx2.arc(-s*0.1,-s*0.06,s*0.08,0,Math.PI*2); ctx2.fill();
+  ctx2.beginPath(); ctx2.arc(s*0.1,-s*0.06,s*0.08,0,Math.PI*2); ctx2.fill();
+  // teeth lines
+  ctx2.strokeStyle='#000212'; ctx2.lineWidth=s*0.04;
+  for(let i=-1;i<=1;i++){
+    ctx2.beginPath(); ctx2.moveTo(i*s*0.12,s*0.05); ctx2.lineTo(i*s*0.12,s*0.21); ctx2.stroke();
+  }
+  ctx2.restore();
+}
+function drawBallPreview_pi(c) {
+  const ctx2=c.getContext('2d'); const s=c.width;
+  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s/2,s/2);
+  ctx2.shadowColor='#ffcc00'; ctx2.shadowBlur=12;
+  ctx2.fillStyle='rgba(255,204,0,0.9)';
+  ctx2.font=`bold ${s*0.55}px Orbitron,serif`;
+  ctx2.textAlign='center'; ctx2.textBaseline='middle';
+  ctx2.fillText('π',0,s*0.04);
+  ctx2.restore();
+}
+
+function drawPaddlePreview_laser(c) {
+  const ctx2=c.getContext('2d'); const s=c.width;
+  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s*0.5,s*0.5);
+  ctx2.shadowColor='#ff4466'; ctx2.shadowBlur=14;
+  const w=s*0.22,h=s*0.72;
+  // body dark metallic
+  const g=ctx2.createLinearGradient(-w/2,0,w/2,0);
+  g.addColorStop(0,'#1a0010'); g.addColorStop(0.5,'rgba(255,68,102,0.8)'); g.addColorStop(1,'#1a0010');
+  ctx2.fillStyle=g;
+  ctx2.beginPath(); ctx2.roundRect(-w/2,-h/2,w,h,4); ctx2.fill();
+  // bright core
+  ctx2.shadowBlur=20; ctx2.fillStyle='rgba(255,68,102,0.6)';
+  ctx2.fillRect(-s*0.04,-h/2,s*0.08,h);
+  // tip glow dot
+  ctx2.fillStyle='#fff'; ctx2.shadowColor='#ff4466';
+  ctx2.beginPath(); ctx2.arc(0,-h/2,s*0.06,0,Math.PI*2); ctx2.fill();
+  ctx2.restore();
+}
+function drawPaddlePreview_neon(c) {
+  const ctx2=c.getContext('2d'); const s=c.width;
+  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s*0.5,s*0.5);
+  const w=s*0.26,h=s*0.72;
+  // rainbow neon gradient
+  const g=ctx2.createLinearGradient(0,-h/2,0,h/2);
+  g.addColorStop(0,'#00eeff'); g.addColorStop(0.33,'#ff44cc'); g.addColorStop(0.66,'#ffcc00'); g.addColorStop(1,'#00ff88');
+  ctx2.shadowColor='#00eeff'; ctx2.shadowBlur=16;
+  ctx2.strokeStyle=g; ctx2.lineWidth=s*0.12;
+  ctx2.lineCap='round';
+  ctx2.beginPath(); ctx2.moveTo(0,-h/2+s*0.06); ctx2.lineTo(0,h/2-s*0.06); ctx2.stroke();
+  // outline
+  ctx2.shadowBlur=6; ctx2.strokeStyle='rgba(255,255,255,0.15)'; ctx2.lineWidth=s*0.26;
+  ctx2.beginPath(); ctx2.roundRect(-w/2,-h/2,w,h,6); ctx2.stroke();
+  ctx2.restore();
+}
+function drawPaddlePreview_ruler(c) {
+  const ctx2=c.getContext('2d'); const s=c.width;
+  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s*0.5,s*0.5);
+  ctx2.shadowColor='#00eeff'; ctx2.shadowBlur=6;
+  const w=s*0.3,h=s*0.72;
+  // ruler body
+  ctx2.fillStyle='rgba(0,180,220,0.25)';
+  ctx2.strokeStyle='rgba(0,238,255,0.7)'; ctx2.lineWidth=s*0.04;
+  ctx2.beginPath(); ctx2.roundRect(-w/2,-h/2,w,h,3); ctx2.fill(); ctx2.stroke();
+  // tick marks
+  ctx2.strokeStyle='rgba(0,238,255,0.5)'; ctx2.lineWidth=s*0.03;
+  const ticks=6;
+  for(let i=1;i<ticks;i++){
+    const y=-h/2+i*(h/ticks);
+    const tw = i%2===0 ? w*0.5 : w*0.3;
+    ctx2.beginPath(); ctx2.moveTo(-tw/2,y); ctx2.lineTo(tw/2,y); ctx2.stroke();
+  }
+  ctx2.restore();
+}
+function drawPaddlePreview_bolt(c) {
+  const ctx2=c.getContext('2d'); const s=c.width;
+  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s*0.5,s*0.5);
+  ctx2.shadowColor='#ffcc00'; ctx2.shadowBlur=16;
+  ctx2.fillStyle='#ffdd33';
+  // lightning bolt shape
+  ctx2.beginPath();
+  ctx2.moveTo(s*0.1,-s*0.42);
+  ctx2.lineTo(-s*0.06,-s*0.04);
+  ctx2.lineTo(s*0.08,-s*0.04);
+  ctx2.lineTo(-s*0.1,s*0.42);
+  ctx2.lineTo(s*0.06,s*0.04);
+  ctx2.lineTo(-s*0.08,s*0.04);
+  ctx2.closePath(); ctx2.fill();
+  ctx2.restore();
+}
   const grid = document.getElementById(gridId);
   if (!grid) return;
   grid.innerHTML = '';
