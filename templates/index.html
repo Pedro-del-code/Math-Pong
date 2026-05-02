@@ -1544,7 +1544,6 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
           <div class="select-arrow">▼</div>
         </div>
       </div>
-
     </div>
 
     <!-- MAIN BUTTONS -->
@@ -1554,7 +1553,10 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
     <div class="menu-divider"></div>
 
     <!-- SECONDARY -->
-    <div class="menu-actions-row" style="grid-template-columns:1fr 1fr;">
+    <div class="menu-actions-row">
+      <button class="btn-action" onclick="showSettings()">
+        <span class="btn-icon">⚙️</span>CONFIG
+      </button>
       <button class="btn-action" onclick="showHowto()">
         <span class="btn-icon">❓</span>REGRAS
       </button>
@@ -1997,88 +1999,6 @@ function drawPaddleRect(px, py, isP1) {
     ctx.closePath();
     ctx.fill();
 
-  } else if (skin === 'laser') {
-    const bodyColor = hitF > 0 ? '#fff' : color;
-    const laserGrad = ctx.createLinearGradient(sx, sy, sx + sw, sy);
-    laserGrad.addColorStop(0, '#1a0010');
-    laserGrad.addColorStop(0.5, isP1 ? 'rgba(0,238,255,0.85)' : 'rgba(255,68,102,0.85)');
-    laserGrad.addColorStop(1, '#1a0010');
-    ctx.fillStyle = laserGrad;
-    ctx.beginPath();
-    ctx.roundRect(sx, sy, sw, sh, r * 0.3);
-    ctx.fill();
-    // bright core line
-    ctx.shadowBlur = hitF > 0 ? SHADOW_PADDLE_HIT : 20;
-    ctx.fillStyle = hitF > 0 ? 'rgba(255,255,255,0.7)' : (isP1 ? 'rgba(0,238,255,0.5)' : 'rgba(255,68,102,0.5)');
-    ctx.fillRect(sx + sw*0.38, sy, sw*0.24, sh);
-    // tip glow
-    ctx.fillStyle = hitF > 0 ? '#fff' : color;
-    ctx.beginPath();
-    ctx.arc(sx + sw*0.5, sy + sh*0.05, sw*0.25, 0, Math.PI*2);
-    ctx.fill();
-
-  } else if (skin === 'neon') {
-    // Rainbow neon paddle
-    const neonGrad = ctx.createLinearGradient(sx, sy, sx, sy + sh);
-    neonGrad.addColorStop(0, '#00eeff');
-    neonGrad.addColorStop(0.33, '#ff44cc');
-    neonGrad.addColorStop(0.66, '#ffcc00');
-    neonGrad.addColorStop(1, '#00ff88');
-    ctx.shadowColor = color;
-    ctx.shadowBlur  = hitF > 0 ? SHADOW_PADDLE_HIT : SHADOW_PADDLE;
-    ctx.strokeStyle = neonGrad;
-    ctx.lineWidth   = sw * 0.55;
-    ctx.lineCap     = 'round';
-    ctx.beginPath();
-    ctx.moveTo(sx + sw*0.5, sy + sw*0.3);
-    ctx.lineTo(sx + sw*0.5, sy + sh - sw*0.3);
-    ctx.stroke();
-    // outer outline
-    ctx.shadowBlur  = 0;
-    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-    ctx.lineWidth   = sw * 0.85;
-    ctx.beginPath();
-    ctx.roundRect(sx + sw*0.08, sy, sw*0.84, sh, r * 0.5);
-    ctx.stroke();
-
-  } else if (skin === 'ruler') {
-    const bodyColor = hitF > 0 ? '#fff' : color;
-    ctx.fillStyle = isP1 ? 'rgba(0,180,220,0.2)' : 'rgba(255,68,102,0.2)';
-    ctx.strokeStyle = hitF > 0 ? '#fff' : color;
-    ctx.lineWidth   = 1.5;
-    ctx.beginPath();
-    ctx.roundRect(sx, sy, sw, sh, r * 0.2);
-    ctx.fill();
-    ctx.stroke();
-    // tick marks
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = hitF > 0 ? 'rgba(255,255,255,0.7)' : (isP1 ? 'rgba(0,238,255,0.6)' : 'rgba(255,68,102,0.6)');
-    ctx.lineWidth = 1;
-    const ticks = 6;
-    for (let i = 1; i < ticks; i++) {
-      const ty = sy + i * (sh / ticks);
-      const tw = i % 2 === 0 ? sw * 0.55 : sw * 0.32;
-      ctx.beginPath();
-      ctx.moveTo(sx + (sw - tw) / 2, ty);
-      ctx.lineTo(sx + (sw + tw) / 2, ty);
-      ctx.stroke();
-    }
-
-  } else if (skin === 'bolt') {
-    ctx.shadowColor = hitF > 0 ? '#fff' : '#ffcc00';
-    ctx.shadowBlur  = hitF > 0 ? SHADOW_PADDLE_HIT : SHADOW_PADDLE;
-    ctx.fillStyle   = hitF > 0 ? '#fff' : '#ffdd33';
-    const bx = sx + sw * 0.5, by = sy + sh * 0.5;
-    ctx.beginPath();
-    ctx.moveTo(bx + sw*0.14,  by - sh*0.5);
-    ctx.lineTo(bx - sw*0.08,  by - sh*0.06);
-    ctx.lineTo(bx + sw*0.11,  by - sh*0.06);
-    ctx.lineTo(bx - sw*0.14,  by + sh*0.5);
-    ctx.lineTo(bx + sw*0.08,  by + sh*0.06);
-    ctx.lineTo(bx - sw*0.11,  by + sh*0.06);
-    ctx.closePath();
-    ctx.fill();
-
   } else {
     // ── Classic (padrão anterior) ─────────────────────────────────────────
     const grad = ctx.createLinearGradient(sx, sy, sx + sw, sy + sh);
@@ -2212,71 +2132,6 @@ function drawBallRect(bx, by) {
     ctx.strokeStyle = 'rgba(255,255,255,0.4)';
     ctx.lineWidth = 1;
     ctx.stroke();
-
-  } else if (skin === 'fire') {
-    ctx.shadowColor = '#ff6600';
-    ctx.shadowBlur  = IS_MOBILE ? 14 : 28;
-    const fg = ctx.createRadialGradient(0, size*0.1, size*0.05, 0, 0, size*0.5);
-    fg.addColorStop(0, '#fff');
-    fg.addColorStop(0.25, '#ffee00');
-    fg.addColorStop(0.6, '#ff6600');
-    fg.addColorStop(1, 'rgba(255,40,0,0)');
-    ctx.fillStyle = fg;
-    ctx.beginPath();
-    ctx.moveTo(0, -size*0.5);
-    ctx.bezierCurveTo(size*0.3, -size*0.27, size*0.38, size*0.14, 0, size*0.5);
-    ctx.bezierCurveTo(-size*0.38, size*0.14, -size*0.3, -size*0.27, 0, -size*0.5);
-    ctx.fill();
-
-  } else if (skin === 'atom') {
-    ctx.shadowColor = '#00ff88';
-    ctx.shadowBlur  = IS_MOBILE ? 14 : 28;
-    ctx.strokeStyle = 'rgba(0,255,136,0.8)';
-    ctx.lineWidth   = size * 0.1;
-    for (let i = 0; i < 3; i++) {
-      ctx.save();
-      ctx.rotate(i * Math.PI / 3);
-      ctx.beginPath();
-      ctx.ellipse(0, 0, size*0.5, size*0.2, 0, 0, Math.PI*2);
-      ctx.stroke();
-      ctx.restore();
-    }
-    ctx.shadowBlur = IS_MOBILE ? 20 : 40;
-    ctx.fillStyle = '#00ff88';
-    ctx.beginPath();
-    ctx.arc(0, 0, size*0.14, 0, Math.PI*2);
-    ctx.fill();
-
-  } else if (skin === 'skull') {
-    ctx.shadowColor = '#aaaaff';
-    ctx.shadowBlur  = IS_MOBILE ? 14 : 28;
-    ctx.fillStyle = 'rgba(190,190,230,0.95)';
-    ctx.beginPath();
-    ctx.arc(0, -size*0.08, size*0.4, Math.PI, 0);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillRect(-size*0.27, size*0.06, size*0.54, size*0.22);
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = '#000212';
-    ctx.beginPath(); ctx.arc(-size*0.14, -size*0.08, size*0.1, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc( size*0.14, -size*0.08, size*0.1, 0, Math.PI*2); ctx.fill();
-    ctx.strokeStyle = '#000212';
-    ctx.lineWidth = size*0.05;
-    for (let i = -1; i <= 1; i++) {
-      ctx.beginPath();
-      ctx.moveTo(i * size*0.16, size*0.06);
-      ctx.lineTo(i * size*0.16, size*0.28);
-      ctx.stroke();
-    }
-
-  } else if (skin === 'pi') {
-    ctx.shadowColor = '#ffcc00';
-    ctx.shadowBlur  = IS_MOBILE ? 14 : 28;
-    ctx.fillStyle = 'rgba(255,204,0,0.95)';
-    ctx.font = `bold ${size * 1.1}px Orbitron, serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('π', 0, size * 0.06);
   }
 
   ctx.restore();
@@ -3424,11 +3279,6 @@ function triggerAIMath() {
       fbEl.textContent = '✓ CORRETO! +1 PONTO';
       SFX.correctAnswer();
       showBigFeedback('correct', '✓ CORRETO!');
-      // Fecha overlay e dispara roleta de efeitos
-      setTimeout(() => {
-        closeAIOverlay();
-        triggerAIRoulette();
-      }, 900);
     } else {
       scores[0] = Math.max(0, scores[0] - 1);
       document.querySelector('#s0 .score-val').textContent = scores[0];
@@ -3436,8 +3286,8 @@ function triggerAIMath() {
       fbEl.textContent = timeLeft2 <= 0 ? '⏱ TEMPO! -1 PONTO' : '✗ ERRADO! -1 PONTO';
       SFX.wrongAnswer();
       showBigFeedback('wrong', timeLeft2 <= 0 ? '⏱ TEMPO!' : '✗ ERRADO!');
-      setTimeout(closeAIOverlay, 1000);
     }
+    setTimeout(closeAIOverlay, 1000);
   }
 
   // Build HTML
@@ -3490,199 +3340,35 @@ function triggerAIMath() {
   }, 100);
 }
 
-// ── ROLETA DE EFEITOS NO MODO IA ──────────────────────────────────────────────
-const AI_EFFECTS = [
-  { label: '🐢 Bola Lenta',        apply: () => applyAIBallSpeed(0.55, 5000) },
-  { label: '⚡ Bola Acelerada',    apply: () => applyAIBallSpeed(1.6,  4000) },
-  { label: '🏓 Raquete Gigante',   apply: () => applyAIPaddleScale(0, 1.9, 8000) },
-  { label: '🔬 IA Minúscula',      apply: () => applyAIPaddleScale(1, 0.45, 8000) },
-  { label: '🔄 IA Invertida',      apply: () => applyAIReverse(6000) },
-  { label: '🧊 Bola Congelada',    apply: () => applyAIFreeze(2000) },
-];
+function genLocalQuestion(lv) {
+  // Simple local question generator for AI mode
+  const types6  = ['soma','sub','mult'];
+  const types7  = ['equacao','potencia','porcentagem'];
+  const types8  = ['potencia','raiz','porcentagem'];
+  const types9  = ['pa','area','raiz'];
+  const types10 = ['log','pa','trig'];
 
-function triggerAIRoulette() {
-  if (!aiMode) return;
-  gamePaused = true;
-
-  // Escolhe efeito aleatório
-  const finalIdx = Math.floor(Math.random() * AI_EFFECTS.length);
-  const chosen   = AI_EFFECTS[finalIdx];
-
-  // Monta dados no mesmo formato que showRoulette espera
-  const allLabels = AI_EFFECTS.map(e => e.label);
-  showRoulette({
-    winner_idx:  0,  // sempre o jogador ganhou
-    all_effects: allLabels,
-    effect:      { label: chosen.label },
-  });
-
-  // Aplica efeito após animação (3s spin + 1.2s resultado = ~4.3s)
-  setTimeout(() => {
-    if (!aiMode) return;
-    chosen.apply();
-  }, 4400);
-}
-
-function applyAIBallSpeed(factor, durationMs) {
-  const b = ballState;
-  const origSpeed = BALL_SPEED_CLIENT;
-  const newSpeed  = origSpeed * factor;
-  const dir = Math.sign(b.vx) || 1;
-  b.vx = dir * newSpeed;
-  b.vy = b.vy * factor;
-  const icon  = factor < 1 ? '🐢' : '⚡';
-  const label = factor < 1 ? 'Bola lenta!' : 'Bola acelerada!';
-  showEffectToast(`${icon} ${label}`, durationMs);
-  addEffectBadge('ai-ball-speed', icon, label, durationMs, factor < 1 ? 'var(--cyan)' : 'var(--gold)');
-  setTimeout(() => {
-    if (!aiMode) return;
-    const d2 = Math.sign(ballState.vx) || 1;
-    ballState.vx = d2 * origSpeed;
-    ballState.vy = ballState.vy / factor;
-    removeEffectBadge('ai-ball-speed');
-  }, durationMs);
-}
-
-function applyAIPaddleScale(playerIdx, scale, durationMs) {
-  if (playerIdx === 0) paddleScaleP0 = scale;
-  else                 paddleScaleP1 = scale;
-  const isMe = playerIdx === 0;
-  const icon  = scale > 1 ? '🏓' : '🔬';
-  const label = isMe
-    ? (scale > 1 ? 'Raquete gigante!' : 'Raquete minúscula!')
-    : (scale > 1 ? 'IA cresceu!'      : 'IA encolheu!');
-  showEffectToast(`${icon} ${label}`, durationMs);
-  addEffectBadge('paddle', icon, label, durationMs, isMe ? 'var(--cyan)' : 'var(--red)');
-  setTimeout(() => {
-    if (!aiMode) return;
-    if (playerIdx === 0) paddleScaleP0 = 1.0;
-    else                 paddleScaleP1 = 1.0;
-    removeEffectBadge('paddle');
-  }, durationMs);
-}
-
-function applyAIReverse(durationMs) {
-  // Inverte os controles da IA (ela perde precisão)
-  aiDifficulty = -Math.abs(aiDifficulty);
-  showEffectToast('🔄 IA com controles invertidos!', durationMs);
-  addEffectBadge('reverse', '🔄', 'IA invertida!', durationMs, 'var(--red)');
-  setTimeout(() => {
-    if (!aiMode) return;
-    aiDifficulty = Math.abs(aiDifficulty);
-    removeEffectBadge('reverse');
-  }, durationMs);
-}
-
-function applyAIFreeze(durationMs) {
-  // A bola já está em movimento (roleta terminou antes de chamar isso)
-  // Captura velocidade atual no momento da aplicação
-  const capVx = Math.sign(ballState.vx || BALL_SPEED_CLIENT) * BALL_SPEED_CLIENT;
-  const capVy = ballState.vy || (Math.random()-0.5)*0.004;
-  ballState.vx = 0; ballState.vy = 0;
-  gamePaused = true;
-  showEffectToast('🧊 Bola congelada!', durationMs);
-  addEffectBadge('freeze', '🧊', 'Bola congelada!', durationMs, '#88ddff');
-  setTimeout(() => {
-    if (!aiMode) return;
-    ballState.vx = capVx;
-    ballState.vy = capVy;
-    gamePaused = false;
-    removeEffectBadge('freeze');
-  }, durationMs);
-}
-
+  let text, answer, choices;
   const r = (a,b) => Math.floor(Math.random()*(b-a+1))+a;
-  function gcd(x,y){ return y===0?x:gcd(y,x%y); }
-  function lcm(a,b){ return (a*b)/gcd(a,b); }
 
-  // ── FÁCEIS ─────────────────────────────────────────────────────────────
-  // Dá pra resolver de cabeça mas não é trivial — tabuada, % básico, etc.
-  const easy = [
-    // Tabuada até 12
-    () => { const a=r(6,12),b=r(6,12); return {q:`${a} × ${b} = ?`, a:a*b}; },
-    // Divisão exata não óbvia
-    () => { const b=r(6,12),q2=r(6,12); return {q:`${b*q2} ÷ ${b} = ?`, a:q2}; },
-    // Quadrado de número de 1 dígito
-    () => { const a=r(6,12); return {q:`${a}² = ?`, a:a*a}; },
-    // Raiz quadrada de perfeitos
-    () => { const perf=[16,25,36,49,64,81,100,121,144]; const n=perf[r(0,8)]; return {q:`√${n} = ?`, a:Math.sqrt(n)|0}; },
-    // 10% de número não redondo
-    () => { const n=r(13,97); return {q:`10% de ${n*10} = ?`, a:n*10}; },
-    // 50% de número ímpar*2
-    () => { const n=r(11,49)*2; return {q:`50% de ${n} = ?`, a:n/2}; },
-    // Porcentagem 25%
-    () => { const n=r(2,12)*4; return {q:`25% de ${n} = ?`, a:n/4}; },
-    // Equação direta: ax = b
-    () => { const a=r(3,9),x=r(4,15); return {q:`${a}x = ${a*x}  →  x = ?`, a:x}; },
-    // Potência de 2 e 3
-    () => { const exp=r(4,8); return {q:`2^${exp} = ?`, a:2**exp}; },
-    () => { const exp=r(3,5); return {q:`3^${exp} = ?`, a:3**exp}; },
-    // Complemento até 1000
-    () => { const a=r(1,9)*100; return {q:`${a} + ? = 1000`, a:1000-a}; },
-    // Adição com números de 3 dígitos
-    () => { const a=r(100,499),b=r(100,499); return {q:`${a} + ${b} = ?`, a:a+b}; },
-    // Subtração com "empréstimo"
-    () => { const b=r(15,49),a=r(b+1,99); return {q:`${a} − ${b} = ?`, a:a-b}; },
-    // Resto de divisão
-    () => { const d=r(5,9),q2=r(3,9),rem=r(1,d-1); return {q:`Resto de ${d*q2+rem} ÷ ${d} = ?`, a:rem}; },
-    // Próximo da PA óbvia
-    () => { const a1=r(3,15),rd=r(3,9); return {q:`PA: ${a1}, ${a1+rd}, ${a1+2*rd} ...  4º termo?`, a:a1+3*rd}; },
-  ];
-
-  // ── MÉDIAS ─────────────────────────────────────────────────────────────
-  // Precisa de 1–2 passos mentais, mas ainda factível sem papel
-  const medium = [
-    // Equação 1º grau com transposição
-    () => { const a=r(3,9),x=r(5,20),b=r(5,30),c=a*x+b; return {q:`${a}x + ${b} = ${c}  →  x = ?`, a:x}; },
-    () => { const a=r(2,7),x=r(3,12),b=r(5,30),c=a*x-b; return {q:`${a}x − ${b} = ${c}  →  x = ?`, a:x}; },
-    // % de número não múltiplo simples
-    () => { const n=r(3,11)*5; return {q:`30% de ${n*10} = ?`, a:n*3}; },
-    () => { const n=r(2,8)*5; return {q:`40% de ${n*10} = ?`, a:n*4}; },
-    () => { const n=r(2,9); return {q:`15% de ${n*20} = ?`, a:n*3}; },
-    // Fração de número
-    () => { const d=r(3,6),num=r(1,d-1),tot=d*r(4,9); return {q:`${num}/${d} de ${tot} = ?`, a:(num/d)*tot}; },
-    // MMC entre pares não óbvios
-    () => { const a=r(4,8)*2,b=r(3,7)*3; return {q:`MMC(${a}, ${b}) = ?`, a:lcm(a,b)}; },
-    // MDC
-    () => { const g=r(3,8),a=g*r(2,5),b=g*r(2,5); return {q:`MDC(${a}, ${b}) = ?`, a:g}; },
-    // Equação 2º grau fatorável simples: x²= n
-    () => { const x=r(4,12); return {q:`x² = ${x*x}  →  x = ? (positivo)`, a:x}; },
-    // Produto notável (a+b)²
-    () => { const a=r(4,9),b=r(2,6); return {q:`(${a}+${b})² = ?`, a:(a+b)**2}; },
-    // Regra de três
-    () => { const p=r(3,9),q2=r(3,8),n=r(3,8); return {q:`${p} produtos custam R$${p*q2}. Quanto custam ${n}?`, a:n*q2}; },
-    // PA: achar o n-ésimo termo
-    () => { const a1=r(2,10),rd=r(3,8),n=r(5,8); return {q:`PA(a₁=${a1}, r=${rd}) → ${n}º termo?`, a:a1+(n-1)*rd}; },
-    // Média de 3 números
-    () => { const a=r(5,20),b=r(5,20),c=r(5,20); return {q:`Média de ${a}, ${b} e ${c}?`, a:Math.round((a+b+c)/3*10)/10}; },
-    // Logaritmo simples
-    () => { const base=[2,3,5,10][r(0,3)],exp=r(2,4); return {q:`log${base}(${base**exp}) = ?`, a:exp}; },
-    // Potência de 10 composta
-    () => { const a=r(2,9); return {q:`${a} × 10² = ?`, a:a*100}; },
-  ];
-
-  // 50% fácil / 50% médio
-  const pool = Math.random() < 0.5 ? easy : medium;
-  const gen  = pool[r(0, pool.length-1)]();
-  const text = gen.q;
-  const answer = gen.a;
-
-  // Gera alternativas erradas plausíveis (próximas do certo)
-  const wrongs = new Set();
-  const spread = Math.max(3, Math.ceil(Math.abs(answer) * 0.25) + 3);
-  let attempts = 0;
-  while(wrongs.size < 3 && attempts < 40) {
-    const d = r(1, spread);
-    const w = Math.round((answer + (Math.random()<0.5 ? d : -d)) * 10) / 10;
-    if (w !== answer && w > 0) wrongs.add(w);
-    attempts++;
+  if (lv <= 6) {
+    const a=r(1,50),b=r(1,50); text=`${a} + ${b} = ?`; answer=a+b;
+  } else if (lv === 7) {
+    const a=r(2,9),x=r(1,15),b=r(0,20),c=a*x+b; text=`${a}x + ${b} = ${c}  →  x = ?`; answer=x;
+  } else if (lv === 8) {
+    const n=[4,9,16,25,36,49,64,81,100][r(0,8)]; text=`√${n} = ?`; answer=Math.sqrt(n)|0;
+  } else if (lv === 9) {
+    const a1=r(1,10),ra=r(2,8),n=r(4,7); text=`PA: ${a1}, ${a1+ra}, ${a1+2*ra},...  ${n}º = ?`; answer=a1+(n-1)*ra;
+  } else {
+    const base=[2,3,10][r(0,2)],exp=r(1,3),val=base**exp; text=`log_${base}(${val}) = ?`; answer=exp;
   }
-  while(wrongs.size < 3) wrongs.add(answer + wrongs.size + 1);
 
-  const choices = [...wrongs, answer];
+  const wrongs = new Set();
+  while(wrongs.size < 3) { const d=r(1,Math.max(3,Math.abs(answer)>>2)+2); wrongs.add(answer+(Math.random()<0.5?d:-d)); }
+  choices = [...wrongs, answer];
   choices.sort(() => Math.random()-0.5);
 
-  return { question: text, choices, correct_idx: choices.indexOf(answer), time_limit: 15 };
+  return { question: text, choices, correct_idx: choices.indexOf(answer), time_limit: 10 };
 }
 
 function endAIGame() {
@@ -3728,6 +3414,7 @@ function joinQueue() {
   if (!name)       { document.getElementById('inp-name').focus(); return; }
   if (!serie)      { document.getElementById('inp-serie').focus(); return; }
   if (!turmaLetra) { document.getElementById('inp-turma').focus(); return; }
+  // Combine: e.g. "9" + "A" → "9A", "1M" + "B" → "1B" (strip M for display)
   const turma = serie.replace('M','') + turmaLetra;
   myName  = name;
   myTurma = turma;
@@ -4193,7 +3880,7 @@ function drawPaddlePreview_pencil(c) {
   ctx2.beginPath(); ctx2.roundRect(x+w*0.1,y,w*0.8,er+2,2); ctx2.fill();
   // ponta
   ctx2.fillStyle='rgba(255,220,120,0.9)';
-  ctx2.beginPath(); ctx2.moveTo(0,y+h); ctx2.lineTo(x+w*0.05,y+h-tip); ctx2.lineTo(x+w*0.95,y+h-tip); ctx2.closePath(); ctx2.fill();
+  ctx2.beginPath(); ctx2.moveTo(s*0,y+h); ctx2.lineTo(x+w*0.05,y+h-tip); ctx2.lineTo(x+w*0.95,y+h-tip); ctx2.closePath(); ctx2.fill();
   ctx2.restore();
 }
 function drawPaddlePreview_classic(c) {
@@ -4416,8 +4103,41 @@ function closeSkins() {
   startMenuPreview();
 }
 
+function showSettings() {
+  SFX.menuBoop();
+  stopMenuPreview();
+  const grid = document.getElementById('level-grid');
+  grid.innerHTML = '';
+  LEVELS.forEach(lv => {
+    const btn = document.createElement('button');
+    btn.className = 'level-btn' + (lv.id === selectedLevel ? ' selected' : '');
+    btn.innerHTML = `<div>${lv.label}</div><div style="font-size:8px;color:#555;letter-spacing:1px;">${lv.sub}</div>`;
+    btn.onclick = () => selectLevel(lv.id);
+    grid.appendChild(btn);
+  });
+  updateLevelDesc();
+  hide('screen-menu');
+  show('screen-settings');
+}
 
+function selectLevel(id) {
+  selectedLevel = id;
+  document.querySelectorAll('.level-btn').forEach((b, i) => {
+    b.classList.toggle('selected', LEVELS[i].id === id);
+  });
+  updateLevelDesc();
+}
 
+function updateLevelDesc() {
+  document.getElementById('level-desc').textContent = LEVEL_DESC[selectedLevel] || '';
+}
+
+function closeSettings() {
+  localStorage.setItem('mathpong_level', selectedLevel);
+  hide('screen-settings');
+  show('screen-menu');
+  startMenuPreview();
+}
 
 // ══ LEADERBOARD MODAL ════════════════════════════════════════════════════════
 let _lbAllData = [];
@@ -4649,15 +4369,29 @@ function closeLeaderboard() {
     <div class="howto-title">🧮 CONTEÚDO MATEMÁTICO</div>
     <div class="howto-row">
       <div class="howto-icon">📚</div>
-      <div class="howto-text">As perguntas misturam <strong>nível fácil e médio</strong>: tabuada, porcentagem, frações, equações simples e muito mais.</div>
+      <div class="howto-text">As perguntas são do <strong>currículo da sua série</strong>: frações, equações, potências, logaritmos, trigonometria e muito mais.</div>
     </div>
     <div class="howto-row">
-      <div class="howto-icon">🧠</div>
-      <div class="howto-text">Todas as questões foram feitas para serem resolvidas <strong>de cabeça</strong>, sem precisar de calculadora!</div>
+      <div class="howto-icon">⚙️</div>
+      <div class="howto-text">Configure o nível em <strong>⚙ CONFIGURAR</strong> para perguntas mais fáceis ou difíceis.</div>
     </div>
   </div>
 
   <button class="btn-secondary" onclick="closeHowto()" style="margin-top:8px;touch-action:manipulation;width:min(280px,85vw);">ENTENDI!</button>
+</div>
+
+<!-- ══ SETTINGS MODAL ══════════════════════════════════════════════════════════ -->
+<div id="screen-settings" class="screen hidden" style="background:rgba(0,2,8,0.97);z-index:500;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:max(24px,env(safe-area-inset-top,24px)) 16px max(80px,env(safe-area-inset-bottom,80px));justify-content:flex-start;align-items:center;gap:0;">
+  <div style="font-size:10px;letter-spacing:6px;color:var(--gold);text-shadow:0 0 14px rgba(255,204,0,0.7);border:1px solid rgba(255,204,0,0.2);padding:5px 16px;border-radius:3px;margin-bottom:18px;flex-shrink:0;">⚙ CONFIGURAÇÕES</div>
+  <div style="font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:3px;color:#444;margin-bottom:16px;text-align:center;flex-shrink:0;">NÍVEL DE DIFICULDADE DAS QUESTÕES</div>
+
+  <div id="level-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:min(320px,88vw);margin-bottom:24px;">
+    <!-- filled by JS -->
+  </div>
+
+  <div id="level-desc" style="font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;color:var(--gold);min-height:18px;text-align:center;margin-bottom:20px;"></div>
+
+  <button class="btn-primary" onclick="closeSettings()" style="width:min(280px,85vw);touch-action:manipulation;"><span>SALVAR</span></button>
 </div>
 
 <!-- ══ LEADERBOARD MODAL ════════════════════════════════════════════════════════ -->
