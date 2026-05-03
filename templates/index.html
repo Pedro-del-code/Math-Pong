@@ -35,7 +35,7 @@
   .input-group { width: min(320px, 92vw) !important; gap: 8px !important; }
   .btn-primary { font-size: 11px !important; letter-spacing: 2px !important; padding: 14px 28px !important; }
   .btn-secondary { font-size: 10px !important; padding: 12px 20px !important; letter-spacing: 2px !important; }
-  #screen-howto, #screen-skins, #screen-leaderboard, #screen-settings {
+  #screen-howto, #screen-skins, #screen-leaderboard {
     padding: 12px 10px 80px !important;
     justify-content: flex-start !important;
     padding-top: 20px !important;
@@ -53,7 +53,6 @@
   #mobile-controls { padding-bottom: max(clamp(16px, 4vw, 24px), env(safe-area-inset-bottom, 16px)) !important; }
   .menu-sub { font-size: 8px !important; letter-spacing: 3px !important; }
   .menu-badge { font-size: 8px !important; letter-spacing: 3px !important; }
-  #level-grid { grid-template-columns: repeat(3,1fr) !important; width: min(300px, 90vw) !important; }
 }
 
 /* ─── MOBILE LANDSCAPE ─── */
@@ -68,7 +67,7 @@
   .menu-logo { width: 100%; text-align: center; }
   .ctrl-btn { width: 60px !important; height: 60px !important; font-size: 18px !important; }
   #mobile-controls { padding-bottom: 4px !important; padding-top: 4px !important; }
-  #screen-howto, #screen-skins, #screen-leaderboard, #screen-settings {
+  #screen-howto, #screen-skins, #screen-leaderboard {
     overflow-y: auto !important; padding: 8px !important; justify-content: flex-start !important;
   }
 }
@@ -81,7 +80,7 @@
   .input-group { width: min(300px, 88vw) !important; }
   .btn-primary { font-size: 12px !important; letter-spacing: 2px !important; padding: 14px 32px !important; }
   .btn-secondary { font-size: 11px !important; padding: 12px 28px !important; }
-  #screen-howto, #screen-skins, #screen-leaderboard, #screen-settings {
+  #screen-howto, #screen-skins, #screen-leaderboard {
     padding: 16px 12px 80px !important;
     justify-content: flex-start !important;
     overflow-y: auto !important;
@@ -98,7 +97,7 @@
   :root { --hud-h: 70px; }
   .menu-logo { font-size: clamp(52px, 8vw, 76px) !important; }
   .input-group { width: min(360px, 78vw) !important; }
-  #screen-howto, #screen-skins, #screen-leaderboard, #screen-settings {
+  #screen-howto, #screen-skins, #screen-leaderboard {
     padding: 24px 24px 60px !important;
     justify-content: flex-start !important;
     overflow-y: auto !important;
@@ -1082,29 +1081,6 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
 #roulette-result.show { opacity:1; transform:translateY(0); }
 
 
-/* ── SETTINGS LEVEL GRID ── */
-.level-btn {
-  font-family:'Orbitron',sans-serif;
-  font-size:10px; font-weight:700; letter-spacing:1px;
-  padding:12px 6px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(255,255,255,0.03);
-  color:rgba(255,255,255,0.4);
-  cursor:pointer; border-radius:8px;
-  transition: all .2s; text-align:center; line-height:1.4;
-  min-height: 52px;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-}
-.level-btn:hover { border-color:rgba(255,204,0,0.4); color:rgba(255,204,0,0.8); }
-.level-btn.selected {
-  border-color: var(--gold);
-  background: rgba(255,204,0,0.1);
-  color: var(--gold);
-  text-shadow: 0 0 12px var(--gold);
-  box-shadow: 0 0 16px rgba(255,204,0,0.2);
-}
-
 /* ── LEADERBOARD PODIUM (inside modal) ── */
 .lb-podium-col { display:flex;flex-direction:column;align-items:center;gap:4px; }
 .lb-podium-bar {
@@ -1246,21 +1222,18 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
 #screen-howto::-webkit-scrollbar,
 #screen-skins::-webkit-scrollbar,
 #screen-leaderboard::-webkit-scrollbar,
-#screen-settings::-webkit-scrollbar,
 #screen-win::-webkit-scrollbar {
   width: 4px;
 }
 #screen-howto::-webkit-scrollbar-track,
 #screen-skins::-webkit-scrollbar-track,
 #screen-leaderboard::-webkit-scrollbar-track,
-#screen-settings::-webkit-scrollbar-track,
 #screen-win::-webkit-scrollbar-track {
   background: rgba(255,255,255,0.02);
 }
 #screen-howto::-webkit-scrollbar-thumb,
 #screen-skins::-webkit-scrollbar-thumb,
 #screen-leaderboard::-webkit-scrollbar-thumb,
-#screen-settings::-webkit-scrollbar-thumb,
 #screen-win::-webkit-scrollbar-thumb {
   background: rgba(0,238,255,0.2);
   border-radius: 2px;
@@ -1553,9 +1526,6 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
 
     <!-- SECONDARY -->
     <div class="menu-actions-row">
-      <button class="btn-action" onclick="showSettings()">
-        <span class="btn-icon">⚙️</span>CONFIG
-      </button>
       <button class="btn-action" onclick="showHowto()">
         <span class="btn-icon">❓</span>REGRAS
       </button>
@@ -2535,9 +2505,8 @@ socket.on('match_found', data=>{
   const msbn1 = document.getElementById('msb-name1'); if(msbn1) msbn1.textContent = nameP1;
   const mbsn0 = document.getElementById('mbs-name0'); if(mbsn0) mbsn0.textContent = nameP0;
   const mbsn1 = document.getElementById('mbs-name1'); if(mbsn1) mbsn1.textContent = nameP1;
-  const lvlName = {6:'6ºEF',7:'7ºEF',8:'8ºEF',9:'9ºEF',10:'1ºEM',11:'2ºEM',12:'3ºEM'};
   document.getElementById('opponent-label').textContent =
-    `VS  ${data.opponent.toUpperCase()}  ·  ${data.turma.toUpperCase()}  ·  ${lvlName[selectedLevel]||''}`;
+    `VS  ${data.opponent.toUpperCase()}  ·  ${data.turma.toUpperCase()}`;
 
   document.querySelector('#s0 .score-val').textContent='0';
   document.querySelector('#s1 .score-val').textContent='0';
@@ -2597,6 +2566,9 @@ socket.on('score_update', data=>{
     ballTrail = [];
     clientRally = 0;
     updateStreakDisplay();
+    // Clear active effect badges
+    const efCont = document.getElementById('effect-status');
+    if (efCont) efCont.innerHTML = '';
   }
 
   if (data.math_penalty && data.penalty_player !== undefined && data.penalty_player >= 0) {
@@ -2744,8 +2716,17 @@ let myTurnToAnswer    = false;
 
 function showMath(data) {
   myTurnToAnswer = true;
+
+  // Update title to emphasize stakes
+  const titleEl = document.getElementById('math-title');
+  if (titleEl) {
+    titleEl.innerHTML = '⚡ DESAFIO — ACERTE: BUFF &nbsp;|&nbsp; ERRE: DEBUFF ⚡';
+    titleEl.style.color = 'var(--gold)';
+    titleEl.style.borderColor = 'rgba(255,204,0,0.3)';
+  }
+
   document.getElementById('math-who').innerHTML =
-    `<span style="color:var(--gold)">⚡ SUA CONTA — RESPONDE!</span>`;
+    `<span style="color:var(--gold)">🧠 RESPONDA DE CABEÇA!</span>`;
   document.getElementById('math-q').textContent = data.question;
   document.getElementById('math-fb').textContent = '';
 
@@ -2759,7 +2740,7 @@ function showMath(data) {
     btnsDiv.appendChild(btn);
   });
 
-  const timeLimit = data.time_limit || 8;
+  const timeLimit = data.time_limit || 10;
   mathTimerSec = timeLimit;
   const timerBar = document.getElementById('math-timer-bar');
   timerBar.style.width='100%';
@@ -3368,6 +3349,7 @@ function triggerAIMath() {
   window._aiMathLock = true;
 
   // Pause ball
+  gamePaused = true;
   const savedVx = ballState.vx || BALL_SPEED_CLIENT;
   ballState.vx = 0; ballState.vy = 0;
 
@@ -3400,12 +3382,12 @@ function triggerAIMath() {
     aiOverlay.style.display = 'none';
     window._aiMathLock = false;
     aiRally = 0;
+    gamePaused = false;
     if (aiMode) {
       ballState.vx = Math.sign(savedVx) * Math.abs(BALL_SPEED_CLIENT);
       ballState.vy = (Math.random() - 0.5) * 0.006;
     }
   }
-
   function resolveAI(correct) {
     clearInterval(timerInterval2);
     // Disable all buttons
@@ -3427,10 +3409,10 @@ function triggerAIMath() {
       SFX.correctAnswer();
       showBigFeedback('correct', '✓ BUFF!');
       // Buff: giant paddle for 8s
-      paddleScaleP0 = 2.0;
+      paddleScaleP0 = 1.8;
       addEffectBadge('buff-paddle', '🏓', 'Raquete gigante!', 8000, '#00ff88');
       showEffectToast('⚡ CORRETO! Raquete gigante por 8s!');
-      setTimeout(() => { paddleScaleP0 = 1.0; }, 8000);
+      setTimeout(() => { if (aiMode) paddleScaleP0 = 1.0; }, 8000);
     } else {
       scores[0] = Math.max(0, scores[0] - 1);
       document.querySelector('#s0 .score-val').textContent = scores[0];
@@ -3442,7 +3424,7 @@ function triggerAIMath() {
       paddleScaleP0 = 0.45;
       addEffectBadge('debuff-paddle', '🔬', 'Raquete minúscula!', 6000, '#ff4466');
       showEffectToast('✗ Raquete minúscula por 6s!');
-      setTimeout(() => { paddleScaleP0 = 1.0; }, 6000);
+      setTimeout(() => { if (aiMode) paddleScaleP0 = 1.0; }, 6000);
     }
     setTimeout(closeAIOverlay, 1000);
   }
@@ -3460,8 +3442,8 @@ function triggerAIMath() {
   ).join('');
 
   aiOverlay.innerHTML = `
-    <div style="font-size:9px;letter-spacing:8px;color:var(--gold);border:1px solid rgba(255,204,0,0.25);padding:5px 16px;border-radius:3px;font-family:'Orbitron',sans-serif;">⚡ DESAFIO MATEMÁTICO ⚡</div>
-    <div style="font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:3px;color:var(--gold);">⚡ SUA CONTA — RESPONDE!</div>
+    <div style="font-size:9px;letter-spacing:8px;color:var(--gold);border:1px solid rgba(255,204,0,0.25);padding:5px 16px;border-radius:3px;font-family:'Orbitron',sans-serif;">⚡ ACERTE: BUFF &nbsp;|&nbsp; ERRE: -1 + DEBUFF ⚡</div>
+    <div style="font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:3px;color:var(--gold);">🧠 RESPONDA DE CABEÇA!</div>
     <div style="font-size:clamp(34px,10vw,56px);font-weight:900;text-shadow:0 0 40px rgba(255,255,255,0.5);letter-spacing:2px;text-align:center;padding:0 16px;">${q.question}</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;width:min(400px,86vw);">${btnGrid}</div>
     <div style="width:min(280px,72vw);height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;margin-top:4px;">
@@ -3503,66 +3485,74 @@ function genLocalQuestion() {
 
   const generators = [
     // Soma simples
-    () => { const a=r(5,50),b=r(5,50); return { q:`${a} + ${b}`, ans: a+b }; },
+    () => { const a=r(5,60),b=r(5,60); return { q:`${a} + ${b}`, ans: a+b }; },
     // Subtração
-    () => { const a=r(20,99),b=r(5,a); return { q:`${a} - ${b}`, ans: a-b }; },
-    // Multiplicação fácil
+    () => { const a=r(20,99),b=r(5,a-1); return { q:`${a} − ${b}`, ans: a-b }; },
+    // Multiplicação tabuada
     () => { const a=r(2,9),b=r(2,9); return { q:`${a} × ${b}`, ans: a*b }; },
-    // Dobro de um número
-    () => { const a=r(10,50); return { q:`Dobro de ${a}`, ans: a*2 }; },
-    // Metade de um número par
-    () => { const a=r(10,50)*2; return { q:`Metade de ${a}`, ans: a/2 }; },
-    // Porcentagem fácil (10%, 25%, 50%)
-    () => {
-      const pcts = [[10, n => n/10], [25, n => n/4], [50, n => n/2]];
-      const [p, fn] = pcts[r(0,2)];
-      const multiples = {10:[10,20,30,40,50,60,70,80,90,100,120,150,200], 25:[4,8,12,16,20,40,60,80,100,200], 50:[2,4,6,8,10,20,40,60,80,100]};
-      const vals = multiples[p]; const a = vals[r(0,vals.length-1)];
-      return { q:`${p}% de ${a}`, ans: fn(a) };
-    },
-    // Quadrado de número pequeno
-    () => { const a=r(2,12); return { q:`${a}² = ?`, ans: a*a }; },
-    // Raiz quadrada perfeita
-    () => { const squares=[4,9,16,25,36,49,64,81,100,121,144]; const n=squares[r(0,squares.length-1)]; return { q:`√${n} = ?`, ans: Math.sqrt(n)|0 }; },
-    // Múltiplo de 5 ou 10
-    () => { const a=r(3,20),b=[5,10][r(0,1)]; return { q:`${a} × ${b}`, ans: a*b }; },
-    // Complemento de 100
-    () => { const a=r(10,90); return { q:`${a} + ? = 100`, ans: 100-a }; },
-    // Divisão exata simples
-    () => { const b=r(2,9),ans=r(2,12); const a=b*ans; return { q:`${a} ÷ ${b}`, ans }; },
-    // Sequência: próximo número (+n)
-    () => { const a=r(1,20),d=r(2,9); return { q:`${a}, ${a+d}, ${a+2*d}, __ = ?`, ans: a+3*d }; },
-    // Soma de três números
-    () => { const a=r(5,30),b=r(5,30),c=r(5,30); return { q:`${a} + ${b} + ${c}`, ans: a+b+c }; },
-    // Arredondamento/estimativa: qual é o mais próximo?
-    () => { const a=r(2,9),b=r(2,9); const prod=a*b; return { q:`${a} × ${b} = ?`, ans: prod }; },
-    // Triplo de um número
+    // Dobro
+    () => { const a=r(8,60); return { q:`Dobro de ${a}`, ans: a*2 }; },
+    // Metade de número par
+    () => { const a=r(10,60)*2; return { q:`Metade de ${a}`, ans: a/2 }; },
+    // Triplo
     () => { const a=r(5,25); return { q:`Triplo de ${a}`, ans: a*3 }; },
-    // Número par/ímpar: qual é o quarto múltiplo?
-    () => { const a=r(2,9); return { q:`4º múltiplo de ${a}`, ans: a*4 }; },
-    // Soma par de dois ímpares
-    () => { const a=r(1,20)*2-1,b=r(1,20)*2-1; return { q:`${a} + ${b}`, ans: a+b }; },
-    // Subtração com resultado negativo? (evitada — sempre positivo)
-    () => { const a=r(5,30),b=r(1,a-1); return { q:`${a} - ${b} - 1`, ans: a-b-1 }; },
-    // Divisão por 2 de número par grande
+    // 10% de um número
+    () => { const a=[10,20,30,40,50,60,70,80,90,100,120,150,200,250,300][r(0,14)]; return { q:`10% de ${a}`, ans: a/10 }; },
+    // 25% de um número
+    () => { const a=[4,8,12,16,20,40,60,80,100,200,400][r(0,10)]; return { q:`25% de ${a}`, ans: a/4 }; },
+    // 50% de um número
+    () => { const a=[10,20,30,40,50,60,80,100,120,200][r(0,9)]; return { q:`50% de ${a}`, ans: a/2 }; },
+    // Quadrado de número pequeno
+    () => { const a=r(2,12); return { q:`${a}²`, ans: a*a }; },
+    // Raiz quadrada perfeita
+    () => { const squares=[4,9,16,25,36,49,64,81,100,121,144]; const n=squares[r(0,squares.length-1)]; return { q:`√${n}`, ans: Math.sqrt(n)|0 }; },
+    // Múltiplo de 5
+    () => { const a=r(3,20); return { q:`${a} × 5`, ans: a*5 }; },
+    // Múltiplo de 10
+    () => { const a=r(3,20); return { q:`${a} × 10`, ans: a*10 }; },
+    // Complemento de 100
+    () => { const a=r(15,85); return { q:`${a} + __ = 100`, ans: 100-a }; },
+    // Divisão exata
+    () => { const b=r(2,9),ans=r(2,12); return { q:`${b*ans} ÷ ${b}`, ans }; },
+    // Sequência +d
+    () => { const a=r(1,20),d=r(2,9); return { q:`${a}, ${a+d}, ${a+2*d}, __ ?`, ans: a+3*d }; },
+    // Soma de três números
+    () => { const a=r(5,25),b=r(5,25),c=r(5,25); return { q:`${a} + ${b} + ${c}`, ans: a+b+c }; },
+    // Número faltante na multiplicação
+    () => { const a=r(2,9),ans=r(2,12); return { q:`${a} × __ = ${a*ans}`, ans }; },
+    // Potência de 2 pequena
+    () => { const a=r(2,6); return { q:`2^${a}`, ans: Math.pow(2,a) }; },
+    // Divisão por 2 de par grande
     () => { const a=r(20,100)*2; return { q:`${a} ÷ 2`, ans: a/2 }; },
-    // Qual número falta? (multiplicação)
-    () => { const a=r(2,9),ans=r(2,12); return { q:`${a} × ? = ${a*ans}`, ans }; },
+    // Subtração dupla
+    () => { const a=r(30,99),b=r(5,20),c=r(1,b-1); return { q:`${a} − ${b} − ${c}`, ans: a-b-c }; },
+    // 4º múltiplo
+    () => { const a=r(2,9); return { q:`4º múltiplo de ${a}`, ans: a*4 }; },
+    // Quantos até 100?
+    () => { const a=r(51,95); return { q:`Quanto falta de ${a} até 100?`, ans: 100-a }; },
+    // Dobro do dobro
+    () => { const a=r(3,20); return { q:`Dobro do dobro de ${a}`, ans: a*4 }; },
+    // Média simples de dois números
+    () => { const a=r(10,50)*2,b=r(10,50)*2; return { q:`Média de ${a} e ${b}`, ans: (a+b)/2 }; },
   ];
 
   const gen = generators[r(0, generators.length-1)];
   const { q: text, ans: answer } = gen();
 
+  // Build wrong answers that are plausible but distinct
   const wrongs = new Set();
   let attempts = 0;
-  while (wrongs.size < 3 && attempts < 40) {
+  const spread = Math.max(2, Math.round(Math.abs(answer) * 0.25) + 2);
+  while (wrongs.size < 3 && attempts < 60) {
     attempts++;
-    const offset = r(1, Math.max(3, Math.round(Math.abs(answer) * 0.3) + 2));
-    const candidate = answer + (Math.random() < 0.5 ? offset : -offset);
-    if (candidate !== answer && candidate >= 0) wrongs.add(candidate);
+    const offsets = [-spread*2, -spread, -1, 1, spread, spread*2, spread*3];
+    const offset = offsets[r(0, offsets.length-1)];
+    const candidate = answer + offset;
+    if (candidate !== answer && candidate >= 0 && !wrongs.has(candidate)) wrongs.add(candidate);
   }
-  // fallback wrong answers if needed
-  while (wrongs.size < 3) wrongs.add(answer + wrongs.size + 1);
+  // fallback
+  let fb = 1;
+  while (wrongs.size < 3) { wrongs.add(answer + fb++); }
 
   const choices = [...wrongs, answer];
   choices.sort(() => Math.random() - 0.5);
@@ -3608,8 +3598,7 @@ function joinQueue() {
   myTurma = turma;
   localStorage.setItem('mathpong_serie', serie);
   localStorage.setItem('mathpong_turma_letra', turmaLetra);
-  const lvl = parseInt(localStorage.getItem('mathpong_level') || '7');
-  socket.emit('join_queue', { name, turma, serie, level: lvl });
+  socket.emit('join_queue', { name, turma, serie });
   show('screen-waiting');
   hide('screen-menu');
 }
@@ -3796,7 +3785,22 @@ function showEffectToast(msg, durationMs = 4000) {
   toast._timeout = setTimeout(() => { toast.style.opacity = '0'; }, durationMs);
 }
 
-socket.on('effect_freeze', () => {
+socket.on('math_debuff', data => {
+  // Server tells us we got a debuff (wrong answer in multiplayer)
+  if (data.player_idx === myIdx) {
+    // Apply debuff to our own paddle
+    if (myIdx === 0) paddleScaleP0 = 0.45;
+    else paddleScaleP1 = 0.45;
+    const dur = (data.duration_ms || 6000);
+    addEffectBadge('debuff-paddle', '🔬', 'Raquete minúscula!', dur, '#ff4466');
+    setTimeout(() => {
+      if (myIdx === 0) paddleScaleP0 = 1.0;
+      else paddleScaleP1 = 1.0;
+    }, dur);
+  }
+});
+
+
   showEffectToast('🧊 Bola congelada por 2s!', 2000);
   addEffectBadge('freeze', '🧊', 'Bola congelada!', 2000, '#88ddff');
 });
@@ -3937,29 +3941,7 @@ function showRoulette(data) {
 }
 
 
-// ══ CONFIGURAÇÕES / NÍVEL ═════════════════════════════════════════════════════
-const LEVELS = [
-  { id: 6,  label: '6º ANO',  sub: 'EF' },
-  { id: 7,  label: '7º ANO',  sub: 'EF' },
-  { id: 8,  label: '8º ANO',  sub: 'EF' },
-  { id: 9,  label: '9º ANO',  sub: 'EF' },
-  { id: 10, label: '1º ANO',  sub: 'EM' },
-  { id: 11, label: '2º ANO',  sub: 'EM' },
-  { id: 12, label: '3º ANO',  sub: 'EM' },
-];
-const LEVEL_DESC = {
-  6:  'MMC, MDC, frações simples, multiplicação',
-  7:  'Frações, equações 1º grau, porcentagem, potências',
-  8:  'Potências, raízes, regra de três, equações',
-  9:  'Equação 2º grau, PA, área de figuras',
-  10: 'Equação 2º grau, PA/PG, trigonometria',
-  11: 'Logaritmos, determinantes, PA/PG',
-  12: 'Derivadas, logaritmos, matrizes, trigonometria',
-};
-
-let selectedLevel = parseInt(localStorage.getItem('mathpong_level') || '7');
-
-// Restaurar seleções do localStorage
+// ══ COMO JOGAR ════════════════════════════════════════════════════════════════
 const savedSerie      = localStorage.getItem('mathpong_serie');
 const savedTurmaLetra = localStorage.getItem('mathpong_turma_letra');
 if (savedSerie)      { const el = document.getElementById('inp-serie');  if (el) el.value = savedSerie; }
@@ -4304,42 +4286,6 @@ function closeSkins() {
   startMenuPreview();
 }
 
-function showSettings() {
-  SFX.menuBoop();
-  stopMenuPreview();
-  const grid = document.getElementById('level-grid');
-  grid.innerHTML = '';
-  LEVELS.forEach(lv => {
-    const btn = document.createElement('button');
-    btn.className = 'level-btn' + (lv.id === selectedLevel ? ' selected' : '');
-    btn.innerHTML = `<div>${lv.label}</div><div style="font-size:8px;color:#555;letter-spacing:1px;">${lv.sub}</div>`;
-    btn.onclick = () => selectLevel(lv.id);
-    grid.appendChild(btn);
-  });
-  updateLevelDesc();
-  hide('screen-menu');
-  show('screen-settings');
-}
-
-function selectLevel(id) {
-  selectedLevel = id;
-  document.querySelectorAll('.level-btn').forEach((b, i) => {
-    b.classList.toggle('selected', LEVELS[i].id === id);
-  });
-  updateLevelDesc();
-}
-
-function updateLevelDesc() {
-  document.getElementById('level-desc').textContent = LEVEL_DESC[selectedLevel] || '';
-}
-
-function closeSettings() {
-  localStorage.setItem('mathpong_level', selectedLevel);
-  hide('screen-settings');
-  show('screen-menu');
-  startMenuPreview();
-}
-
 // ══ LEADERBOARD MODAL ════════════════════════════════════════════════════════
 let _lbAllData = [];
 let _lbTurmaFilter = '';
@@ -4466,10 +4412,6 @@ function closeLeaderboard() {
   startMenuPreview();
 }
 
-// joinQueue already sends level (defined above)
-
-// Level shown in opponent label via the existing match_found handler above
-
 </script>
 
 <!-- ══ MAP ROULETTE ══════════════════════════════════════════════════════════ -->
@@ -4579,20 +4521,6 @@ function closeLeaderboard() {
   </div>
 
   <button class="btn-secondary" onclick="closeHowto()" style="margin-top:8px;touch-action:manipulation;width:min(280px,85vw);">ENTENDI!</button>
-</div>
-
-<!-- ══ SETTINGS MODAL ══════════════════════════════════════════════════════════ -->
-<div id="screen-settings" class="screen hidden" style="background:rgba(0,2,8,0.97);z-index:500;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:max(24px,env(safe-area-inset-top,24px)) 16px max(80px,env(safe-area-inset-bottom,80px));justify-content:flex-start;align-items:center;gap:0;">
-  <div style="font-size:10px;letter-spacing:6px;color:var(--gold);text-shadow:0 0 14px rgba(255,204,0,0.7);border:1px solid rgba(255,204,0,0.2);padding:5px 16px;border-radius:3px;margin-bottom:18px;flex-shrink:0;">⚙ CONFIGURAÇÕES</div>
-  <div style="font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:3px;color:#444;margin-bottom:16px;text-align:center;flex-shrink:0;">NÍVEL DE DIFICULDADE DAS QUESTÕES</div>
-
-  <div id="level-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:min(320px,88vw);margin-bottom:24px;">
-    <!-- filled by JS -->
-  </div>
-
-  <div id="level-desc" style="font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;color:var(--gold);min-height:18px;text-align:center;margin-bottom:20px;"></div>
-
-  <button class="btn-primary" onclick="closeSettings()" style="width:min(280px,85vw);touch-action:manipulation;"><span>SALVAR</span></button>
 </div>
 
 <!-- ══ LEADERBOARD MODAL ════════════════════════════════════════════════════════ -->
