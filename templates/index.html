@@ -3527,18 +3527,7 @@ function endAIGame() {
   });
 }
 
-// Override goMenu to also stop AI
-const _origGoMenu = goMenu;
-goMenu = function() {
-  if (aiMode) {
-    aiMode = false;
-    window._aiMathLock = false;
-    clearInterval(aiInterval);
-    const ao = document.getElementById('ai-math-overlay');
-    if (ao) ao.style.display = 'none';
-  }
-  _origGoMenu();
-};
+// AI cleanup — called by goMenu below (merged to avoid override order bug)
 
 // ══ QUEUE ═════════════════════════════════════════════════════════════════════
 function joinQueue() {
@@ -3568,12 +3557,19 @@ function cancelQueue() {
 }
 
 function goMenu() {
+  // Stop AI mode if active (merged here to avoid override/hoisting order bug)
+  if (typeof aiMode !== 'undefined' && aiMode) {
+    aiMode = false;
+    if (typeof window._aiMathLock !== 'undefined') window._aiMathLock = false;
+    if (typeof aiInterval !== 'undefined') clearInterval(aiInterval);
+    const ao = document.getElementById('ai-math-overlay');
+    if (ao) ao.style.display = 'none';
+  }
   stopConfetti();
   startMenuPreview();
   currentMap = null;
   _bgGrad = null;
-  gamePaused = false; // garante reset
-  // Clear effect badges
+  gamePaused = false;
   const efCont = document.getElementById('effect-status');
   if (efCont) efCont.innerHTML = '';
   clientRally = 0;
@@ -3955,9 +3951,10 @@ const PADDLE_SKINS = [
   { id:'bolt',    label:'RELÂMPO',  draw: drawPaddlePreview_bolt     },
 ];
 
+function _skinSize(c) { return Math.round(c.width / (window.devicePixelRatio || 1)); }
 function drawBallPreview_xmark(c) {
-  const ctx2=c.getContext('2d'); const s=c.width;
-  ctx2.clearRect(0,0,s,s);
+  const ctx2=c.getContext('2d'); const s=_skinSize(c);
+  ctx2.clearRect(0,0,c.width,c.height);
   ctx2.save(); ctx2.translate(s/2,s/2);
   ctx2.shadowColor='#9b8fe8'; ctx2.shadowBlur=10;
   ctx2.strokeStyle='#c4b5fd'; ctx2.lineWidth=s*0.14; ctx2.lineCap='round';
@@ -3967,8 +3964,8 @@ function drawBallPreview_xmark(c) {
   ctx2.restore();
 }
 function drawBallPreview_circle(c) {
-  const ctx2=c.getContext('2d'); const s=c.width;
-  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s/2,s/2);
+  const ctx2=c.getContext('2d'); const s=_skinSize(c);
+  ctx2.clearRect(0,0,c.width,c.height); ctx2.save(); ctx2.translate(s/2,s/2);
   ctx2.shadowColor='#00eeff'; ctx2.shadowBlur=10;
   const g=ctx2.createRadialGradient(-s*0.1,-s*0.1,s*0.04,0,0,s*0.38);
   g.addColorStop(0,'#fff'); g.addColorStop(0.4,'#00eeff'); g.addColorStop(1,'#0044aa');
@@ -3977,8 +3974,8 @@ function drawBallPreview_circle(c) {
   ctx2.restore();
 }
 function drawBallPreview_star(c) {
-  const ctx2=c.getContext('2d'); const s=c.width;
-  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s/2,s/2);
+  const ctx2=c.getContext('2d'); const s=_skinSize(c);
+  ctx2.clearRect(0,0,c.width,c.height); ctx2.save(); ctx2.translate(s/2,s/2);
   ctx2.shadowColor='#ffcc00'; ctx2.shadowBlur=10;
   ctx2.fillStyle='#ffdd33';
   const rs=s*0.4,ri=s*0.17;
@@ -3991,8 +3988,8 @@ function drawBallPreview_star(c) {
   ctx2.closePath(); ctx2.fill(); ctx2.restore();
 }
 function drawBallPreview_diamond(c) {
-  const ctx2=c.getContext('2d'); const s=c.width;
-  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s/2,s/2);
+  const ctx2=c.getContext('2d'); const s=_skinSize(c);
+  ctx2.clearRect(0,0,c.width,c.height); ctx2.save(); ctx2.translate(s/2,s/2);
   ctx2.shadowColor='#ff4466'; ctx2.shadowBlur=10;
   const g=ctx2.createLinearGradient(-s*0.38,0,s*0.38,0);
   g.addColorStop(0,'#ff4466'); g.addColorStop(0.5,'#ffaacc'); g.addColorStop(1,'#ff4466');
@@ -4002,8 +3999,8 @@ function drawBallPreview_diamond(c) {
 }
 
 function drawPaddlePreview_pencil(c) {
-  const ctx2=c.getContext('2d'); const s=c.width;
-  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s*0.5,s*0.5);
+  const ctx2=c.getContext('2d'); const s=_skinSize(c);
+  ctx2.clearRect(0,0,c.width,c.height); ctx2.save(); ctx2.translate(s*0.5,s*0.5);
   ctx2.shadowColor='#00eeff'; ctx2.shadowBlur=8;
   const w=s*0.28,h=s*0.72,x=-s*0.14,y=-s*0.36;
   const tip=h*0.2,er=h*0.1;
@@ -4019,8 +4016,8 @@ function drawPaddlePreview_pencil(c) {
   ctx2.restore();
 }
 function drawPaddlePreview_classic(c) {
-  const ctx2=c.getContext('2d'); const s=c.width;
-  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s*0.5,s*0.5);
+  const ctx2=c.getContext('2d'); const s=_skinSize(c);
+  ctx2.clearRect(0,0,c.width,c.height); ctx2.save(); ctx2.translate(s*0.5,s*0.5);
   ctx2.shadowColor='#00eeff'; ctx2.shadowBlur=8;
   const w=s*0.28,h=s*0.72;
   const g=ctx2.createLinearGradient(-w/2,-h/2,w/2,h/2);
@@ -4030,8 +4027,8 @@ function drawPaddlePreview_classic(c) {
   ctx2.restore();
 }
 function drawPaddlePreview_sword(c) {
-  const ctx2=c.getContext('2d'); const s=c.width;
-  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s*0.5,s*0.5);
+  const ctx2=c.getContext('2d'); const s=_skinSize(c);
+  ctx2.clearRect(0,0,c.width,c.height); ctx2.save(); ctx2.translate(s*0.5,s*0.5);
   ctx2.shadowColor='#00eeff'; ctx2.shadowBlur=8;
   const h=s*0.72;
   ctx2.fillStyle='rgba(200,220,255,0.8)';
@@ -4043,8 +4040,8 @@ function drawPaddlePreview_sword(c) {
   ctx2.restore();
 }
 function drawPaddlePreview_wand(c) {
-  const ctx2=c.getContext('2d'); const s=c.width;
-  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s*0.5,s*0.5);
+  const ctx2=c.getContext('2d'); const s=_skinSize(c);
+  ctx2.clearRect(0,0,c.width,c.height); ctx2.save(); ctx2.translate(s*0.5,s*0.5);
   ctx2.shadowColor='#00ffcc'; ctx2.shadowBlur=8;
   const h=s*0.72;
   ctx2.fillStyle='rgba(80,40,20,0.9)';
@@ -4062,8 +4059,8 @@ function drawPaddlePreview_wand(c) {
 }
 
 function drawBallPreview_fire(c) {
-  const ctx2=c.getContext('2d'); const s=c.width;
-  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s/2,s/2);
+  const ctx2=c.getContext('2d'); const s=_skinSize(c);
+  ctx2.clearRect(0,0,c.width,c.height); ctx2.save(); ctx2.translate(s/2,s/2);
   // outer glow
   ctx2.shadowColor='#ff6600'; ctx2.shadowBlur=14;
   // flame body
@@ -4078,8 +4075,8 @@ function drawBallPreview_fire(c) {
   ctx2.restore();
 }
 function drawBallPreview_atom(c) {
-  const ctx2=c.getContext('2d'); const s=c.width;
-  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s/2,s/2);
+  const ctx2=c.getContext('2d'); const s=_skinSize(c);
+  ctx2.clearRect(0,0,c.width,c.height); ctx2.save(); ctx2.translate(s/2,s/2);
   ctx2.shadowColor='#00ff88'; ctx2.shadowBlur=10;
   ctx2.strokeStyle='rgba(0,255,136,0.7)'; ctx2.lineWidth=s*0.07;
   // 3 orbits
@@ -4094,8 +4091,8 @@ function drawBallPreview_atom(c) {
   ctx2.restore();
 }
 function drawBallPreview_skull(c) {
-  const ctx2=c.getContext('2d'); const s=c.width;
-  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s/2,s/2);
+  const ctx2=c.getContext('2d'); const s=_skinSize(c);
+  ctx2.clearRect(0,0,c.width,c.height); ctx2.save(); ctx2.translate(s/2,s/2);
   ctx2.shadowColor='#aaaaff'; ctx2.shadowBlur=10;
   ctx2.fillStyle='rgba(180,180,220,0.9)';
   // cranium
@@ -4114,8 +4111,8 @@ function drawBallPreview_skull(c) {
   ctx2.restore();
 }
 function drawBallPreview_pi(c) {
-  const ctx2=c.getContext('2d'); const s=c.width;
-  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s/2,s/2);
+  const ctx2=c.getContext('2d'); const s=_skinSize(c);
+  ctx2.clearRect(0,0,c.width,c.height); ctx2.save(); ctx2.translate(s/2,s/2);
   ctx2.shadowColor='#ffcc00'; ctx2.shadowBlur=12;
   ctx2.fillStyle='rgba(255,204,0,0.9)';
   ctx2.font=`bold ${s*0.55}px Orbitron,serif`;
@@ -4125,8 +4122,8 @@ function drawBallPreview_pi(c) {
 }
 
 function drawPaddlePreview_laser(c) {
-  const ctx2=c.getContext('2d'); const s=c.width;
-  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s*0.5,s*0.5);
+  const ctx2=c.getContext('2d'); const s=_skinSize(c);
+  ctx2.clearRect(0,0,c.width,c.height); ctx2.save(); ctx2.translate(s*0.5,s*0.5);
   ctx2.shadowColor='#ff4466'; ctx2.shadowBlur=14;
   const w=s*0.22,h=s*0.72;
   // body dark metallic
@@ -4143,8 +4140,8 @@ function drawPaddlePreview_laser(c) {
   ctx2.restore();
 }
 function drawPaddlePreview_neon(c) {
-  const ctx2=c.getContext('2d'); const s=c.width;
-  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s*0.5,s*0.5);
+  const ctx2=c.getContext('2d'); const s=_skinSize(c);
+  ctx2.clearRect(0,0,c.width,c.height); ctx2.save(); ctx2.translate(s*0.5,s*0.5);
   const w=s*0.26,h=s*0.72;
   // rainbow neon gradient
   const g=ctx2.createLinearGradient(0,-h/2,0,h/2);
@@ -4159,8 +4156,8 @@ function drawPaddlePreview_neon(c) {
   ctx2.restore();
 }
 function drawPaddlePreview_ruler(c) {
-  const ctx2=c.getContext('2d'); const s=c.width;
-  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s*0.5,s*0.5);
+  const ctx2=c.getContext('2d'); const s=_skinSize(c);
+  ctx2.clearRect(0,0,c.width,c.height); ctx2.save(); ctx2.translate(s*0.5,s*0.5);
   ctx2.shadowColor='#00eeff'; ctx2.shadowBlur=6;
   const w=s*0.3,h=s*0.72;
   // ruler body
@@ -4178,8 +4175,8 @@ function drawPaddlePreview_ruler(c) {
   ctx2.restore();
 }
 function drawPaddlePreview_bolt(c) {
-  const ctx2=c.getContext('2d'); const s=c.width;
-  ctx2.clearRect(0,0,s,s); ctx2.save(); ctx2.translate(s*0.5,s*0.5);
+  const ctx2=c.getContext('2d'); const s=_skinSize(c);
+  ctx2.clearRect(0,0,c.width,c.height); ctx2.save(); ctx2.translate(s*0.5,s*0.5);
   ctx2.shadowColor='#ffcc00'; ctx2.shadowBlur=16;
   ctx2.fillStyle='#ffdd33';
   // lightning bolt shape
@@ -4198,11 +4195,16 @@ function buildSkinGrid(gridId, skins, currentId, onSelect) {
   const grid = document.getElementById(gridId);
   if (!grid) return;
   grid.innerHTML = '';
+  const dpr = window.devicePixelRatio || 1;
+  const size = 44;
   skins.forEach(skin => {
     const btn = document.createElement('button');
     btn.className = 'skin-btn' + (skin.id === currentId ? ' selected' : '');
     const c = document.createElement('canvas');
-    c.width = 44; c.height = 44; c.style.cssText='width:44px;height:44px;';
+    c.width = size * dpr; c.height = size * dpr;
+    c.style.cssText = `width:${size}px;height:${size}px;`;
+    const ctx2 = c.getContext('2d');
+    ctx2.scale(dpr, dpr);
     skin.draw(c);
     btn.appendChild(c);
     const lbl = document.createElement('span');
