@@ -1656,6 +1656,25 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
 
 <script>
 
+// ── POLYFILL: roundRect para Android/iOS antigos ──────────────────────────
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+    if (typeof r === 'object') r = r[0] || 0;
+    r = Math.min(r || 0, Math.abs(w)/2, Math.abs(h)/2);
+    this.beginPath();
+    this.moveTo(x + r, y);
+    this.lineTo(x + w - r, y);
+    this.quadraticCurveTo(x + w, y, x + w, y + r);
+    this.lineTo(x + w, y + h - r);
+    this.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    this.lineTo(x + r, y + h);
+    this.quadraticCurveTo(x, y + h, x, y + h - r);
+    this.lineTo(x, y + r);
+    this.quadraticCurveTo(x, y, x + r, y);
+    this.closePath();
+    return this;
+  };
+}
 
 // ══ SISTEMA DE ÁUDIO (Web Audio API) ════════════════════════════════════════
 let _audioCtx = null;
