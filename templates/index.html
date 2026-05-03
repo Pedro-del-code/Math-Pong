@@ -2606,12 +2606,27 @@ socket.on('score_update', data=>{
       penEl.style.transform = 'scale(0.8)';
       penEl.style.transition = 'all 0.2s';
       const isMe = data.penalty_player === myIdx;
-      showEffectToast(isMe ? '✗ -1 ponto (errou!)' : '✗ Inimigo perdeu 1 ponto!');
+      showEffectToast(isMe ? '✗ -1 ponto + DEBUFF na defesa!' : '✗ Inimigo perdeu 1 ponto + DEBUFF!');
+      if (isMe) {
+        // Apply debuff: tiny paddle for 6 seconds
+        const myScale = myIdx === 0 ? 0 : 1;
+        if (myIdx === 0) paddleScaleP0 = 0.45;
+        else paddleScaleP1 = 0.45;
+        setTimeout(() => {
+          if (myIdx === 0) paddleScaleP0 = 1.0;
+          else paddleScaleP1 = 1.0;
+        }, 6000);
+        addEffectBadge('debuff-paddle', '🔬', 'Raquete minúscula!', 6000, '#ff4466');
+      }
       setTimeout(() => {
         penEl.style.transform = 'scale(1)';
         penEl.style.color = data.penalty_player === 0 ? 'var(--cyan)' : 'var(--red)';
       }, 400);
     }
+  } else if (data.math_correct_buff && data.buff_player !== undefined && data.buff_player >= 0) {
+    // Correct answer: show buff toast (roulette handles the actual buff via roulette_spin event)
+    const isMe = data.buff_player === myIdx;
+    showEffectToast(isMe ? '⚡ CORRETO! Girando roleta de buffs!' : '⚡ Inimigo acertou — buff vindo!');
   } else if (data.scorer >= 0) {
     armSwing = 8;
     // Goal flash
@@ -2802,17 +2817,17 @@ function resolvemath(data) {
   const btns = document.querySelectorAll('.math-btn');
   btns.forEach((b,i)=>{ if(i===data.correct_idx) b.classList.add('correct'); else b.classList.add('wrong'); b.onclick=null; });
   if(data.feedback==='correct') {
-    fb.style.color=var_green; fb.textContent='✓ CORRETO! +1 PONTO';
+    fb.style.color=var_green; fb.textContent='✓ CORRETO! ⚡ BUFF LIBERADO!';
     SFX.correctAnswer();
-    showBigFeedback('correct', '✓ CORRETO!');
+    showBigFeedback('correct', '✓ BUFF!');
   } else if(data.feedback==='wrong') {
-    fb.style.color='#ff4466'; fb.textContent='✗ ERRADO! -1 PONTO';
+    fb.style.color='#ff4466'; fb.textContent='✗ ERRADO! -1 PONTO + DEBUFF!';
     SFX.wrongAnswer();
-    showBigFeedback('wrong', '✗ ERRADO!');
+    showBigFeedback('wrong', '✗ ERRADO! -1');
   } else {
-    fb.style.color='#ffcc00'; fb.textContent='⏱ TEMPO ESGOTADO! -1 PONTO';
+    fb.style.color='#ffcc00'; fb.textContent='⏱ TEMPO! -1 PONTO + DEBUFF!';
     SFX.wrongAnswer();
-    showBigFeedback('wrong', '⏱ TEMPO!');
+    showBigFeedback('wrong', '⏱ TEMPO! -1');
   }
   // force reflow for animation
   fb.style.animation = 'none'; fb.offsetHeight; fb.style.animation = '';
@@ -3356,8 +3371,7 @@ function triggerAIMath() {
   const savedVx = ballState.vx || BALL_SPEED_CLIENT;
   ballState.vx = 0; ballState.vy = 0;
 
-  const lvl = parseInt(localStorage.getItem('mathpong_level') || '7');
-  const q = genLocalQuestion(lvl);
+  const q = genLocalQuestion();
 
   // Build a standalone AI math overlay (no shared multiplayer state)
   let aiOverlay = document.getElementById('ai-math-overlay');
@@ -3408,19 +3422,27 @@ function triggerAIMath() {
     });
     const fbEl = aiOverlay.querySelector('#ai-fb');
     if (correct) {
-      scores[0]++;
-      document.querySelector('#s0 .score-val').textContent = scores[0];
       fbEl.style.color = '#00ff88';
-      fbEl.textContent = '✓ CORRETO! +1 PONTO';
+      fbEl.textContent = '✓ CORRETO! ⚡ BUFF ATIVADO!';
       SFX.correctAnswer();
-      showBigFeedback('correct', '✓ CORRETO!');
+      showBigFeedback('correct', '✓ BUFF!');
+      // Buff: giant paddle for 8s
+      paddleScaleP0 = 2.0;
+      addEffectBadge('buff-paddle', '🏓', 'Raquete gigante!', 8000, '#00ff88');
+      showEffectToast('⚡ CORRETO! Raquete gigante por 8s!');
+      setTimeout(() => { paddleScaleP0 = 1.0; }, 8000);
     } else {
       scores[0] = Math.max(0, scores[0] - 1);
       document.querySelector('#s0 .score-val').textContent = scores[0];
       fbEl.style.color = '#ff4466';
-      fbEl.textContent = timeLeft2 <= 0 ? '⏱ TEMPO! -1 PONTO' : '✗ ERRADO! -1 PONTO';
+      fbEl.textContent = timeLeft2 <= 0 ? '⏱ TEMPO! -1 PONTO + DEBUFF!' : '✗ ERRADO! -1 PONTO + DEBUFF!';
       SFX.wrongAnswer();
-      showBigFeedback('wrong', timeLeft2 <= 0 ? '⏱ TEMPO!' : '✗ ERRADO!');
+      showBigFeedback('wrong', timeLeft2 <= 0 ? '⏱ TEMPO! -1' : '✗ ERRADO! -1');
+      // Debuff: tiny paddle for 6s
+      paddleScaleP0 = 0.45;
+      addEffectBadge('debuff-paddle', '🔬', 'Raquete minúscula!', 6000, '#ff4466');
+      showEffectToast('✗ Raquete minúscula por 6s!');
+      setTimeout(() => { paddleScaleP0 = 1.0; }, 6000);
     }
     setTimeout(closeAIOverlay, 1000);
   }
@@ -3475,35 +3497,77 @@ function triggerAIMath() {
   }, 100);
 }
 
-function genLocalQuestion(lv) {
-  // Simple local question generator for AI mode
-  const types6  = ['soma','sub','mult'];
-  const types7  = ['equacao','potencia','porcentagem'];
-  const types8  = ['potencia','raiz','porcentagem'];
-  const types9  = ['pa','area','raiz'];
-  const types10 = ['log','pa','trig'];
-
-  let text, answer, choices;
+function genLocalQuestion() {
+  // Questões variadas de cabeça — fáceis e difíceis, sem nível de dificuldade fixo
   const r = (a,b) => Math.floor(Math.random()*(b-a+1))+a;
 
-  if (lv <= 6) {
-    const a=r(1,50),b=r(1,50); text=`${a} + ${b} = ?`; answer=a+b;
-  } else if (lv === 7) {
-    const a=r(2,9),x=r(1,15),b=r(0,20),c=a*x+b; text=`${a}x + ${b} = ${c}  →  x = ?`; answer=x;
-  } else if (lv === 8) {
-    const n=[4,9,16,25,36,49,64,81,100][r(0,8)]; text=`√${n} = ?`; answer=Math.sqrt(n)|0;
-  } else if (lv === 9) {
-    const a1=r(1,10),ra=r(2,8),n=r(4,7); text=`PA: ${a1}, ${a1+ra}, ${a1+2*ra},...  ${n}º = ?`; answer=a1+(n-1)*ra;
-  } else {
-    const base=[2,3,10][r(0,2)],exp=r(1,3),val=base**exp; text=`log_${base}(${val}) = ?`; answer=exp;
-  }
+  const generators = [
+    // Soma simples
+    () => { const a=r(5,50),b=r(5,50); return { q:`${a} + ${b}`, ans: a+b }; },
+    // Subtração
+    () => { const a=r(20,99),b=r(5,a); return { q:`${a} - ${b}`, ans: a-b }; },
+    // Multiplicação fácil
+    () => { const a=r(2,9),b=r(2,9); return { q:`${a} × ${b}`, ans: a*b }; },
+    // Dobro de um número
+    () => { const a=r(10,50); return { q:`Dobro de ${a}`, ans: a*2 }; },
+    // Metade de um número par
+    () => { const a=r(10,50)*2; return { q:`Metade de ${a}`, ans: a/2 }; },
+    // Porcentagem fácil (10%, 25%, 50%)
+    () => {
+      const pcts = [[10, n => n/10], [25, n => n/4], [50, n => n/2]];
+      const [p, fn] = pcts[r(0,2)];
+      const multiples = {10:[10,20,30,40,50,60,70,80,90,100,120,150,200], 25:[4,8,12,16,20,40,60,80,100,200], 50:[2,4,6,8,10,20,40,60,80,100]};
+      const vals = multiples[p]; const a = vals[r(0,vals.length-1)];
+      return { q:`${p}% de ${a}`, ans: fn(a) };
+    },
+    // Quadrado de número pequeno
+    () => { const a=r(2,12); return { q:`${a}² = ?`, ans: a*a }; },
+    // Raiz quadrada perfeita
+    () => { const squares=[4,9,16,25,36,49,64,81,100,121,144]; const n=squares[r(0,squares.length-1)]; return { q:`√${n} = ?`, ans: Math.sqrt(n)|0 }; },
+    // Múltiplo de 5 ou 10
+    () => { const a=r(3,20),b=[5,10][r(0,1)]; return { q:`${a} × ${b}`, ans: a*b }; },
+    // Complemento de 100
+    () => { const a=r(10,90); return { q:`${a} + ? = 100`, ans: 100-a }; },
+    // Divisão exata simples
+    () => { const b=r(2,9),ans=r(2,12); const a=b*ans; return { q:`${a} ÷ ${b}`, ans }; },
+    // Sequência: próximo número (+n)
+    () => { const a=r(1,20),d=r(2,9); return { q:`${a}, ${a+d}, ${a+2*d}, __ = ?`, ans: a+3*d }; },
+    // Soma de três números
+    () => { const a=r(5,30),b=r(5,30),c=r(5,30); return { q:`${a} + ${b} + ${c}`, ans: a+b+c }; },
+    // Arredondamento/estimativa: qual é o mais próximo?
+    () => { const a=r(2,9),b=r(2,9); const prod=a*b; return { q:`${a} × ${b} = ?`, ans: prod }; },
+    // Triplo de um número
+    () => { const a=r(5,25); return { q:`Triplo de ${a}`, ans: a*3 }; },
+    // Número par/ímpar: qual é o quarto múltiplo?
+    () => { const a=r(2,9); return { q:`4º múltiplo de ${a}`, ans: a*4 }; },
+    // Soma par de dois ímpares
+    () => { const a=r(1,20)*2-1,b=r(1,20)*2-1; return { q:`${a} + ${b}`, ans: a+b }; },
+    // Subtração com resultado negativo? (evitada — sempre positivo)
+    () => { const a=r(5,30),b=r(1,a-1); return { q:`${a} - ${b} - 1`, ans: a-b-1 }; },
+    // Divisão por 2 de número par grande
+    () => { const a=r(20,100)*2; return { q:`${a} ÷ 2`, ans: a/2 }; },
+    // Qual número falta? (multiplicação)
+    () => { const a=r(2,9),ans=r(2,12); return { q:`${a} × ? = ${a*ans}`, ans }; },
+  ];
+
+  const gen = generators[r(0, generators.length-1)];
+  const { q: text, ans: answer } = gen();
 
   const wrongs = new Set();
-  while(wrongs.size < 3) { const d=r(1,Math.max(3,Math.abs(answer)>>2)+2); wrongs.add(answer+(Math.random()<0.5?d:-d)); }
-  choices = [...wrongs, answer];
-  choices.sort(() => Math.random()-0.5);
+  let attempts = 0;
+  while (wrongs.size < 3 && attempts < 40) {
+    attempts++;
+    const offset = r(1, Math.max(3, Math.round(Math.abs(answer) * 0.3) + 2));
+    const candidate = answer + (Math.random() < 0.5 ? offset : -offset);
+    if (candidate !== answer && candidate >= 0) wrongs.add(candidate);
+  }
+  // fallback wrong answers if needed
+  while (wrongs.size < 3) wrongs.add(answer + wrongs.size + 1);
 
-  return { question: text, choices, correct_idx: choices.indexOf(answer), time_limit: 10 };
+  const choices = [...wrongs, answer];
+  choices.sort(() => Math.random() - 0.5);
+
+  return { question: `${text} = ?`, choices, correct_idx: choices.indexOf(answer), time_limit: 10 };
 }
 
 function endAIGame() {
@@ -4421,7 +4485,7 @@ function closeLeaderboard() {
 
 <!-- ══ ROULETTE OVERLAY ════════════════════════════════════════════════════════ -->
 <div id="roulette-overlay">
-  <div id="roulette-winner-label">ACERTOU!</div>
+  <div id="roulette-winner-label">⚡ BUFF LIBERADO!</div>
   <div id="roulette-winner-name"></div>
   <div id="roulette-title">⚡ ROLETA DE EFEITOS ⚡</div>
   <div id="roulette-track-wrap">
@@ -4478,11 +4542,11 @@ function closeLeaderboard() {
     </div>
     <div class="howto-row">
       <div class="howto-icon">✅</div>
-      <div class="howto-text"><strong>Acertou?</strong> +1 ponto e você gira a roleta de efeitos especiais!</div>
+      <div class="howto-text"><strong>Acertou?</strong> Você gira a roleta e ganha um <strong>buff</strong> que ajuda a marcar ponto (raquete maior, bola lenta, controles invertidos no inimigo...).</div>
     </div>
     <div class="howto-row">
       <div class="howto-icon">❌</div>
-      <div class="howto-text"><strong>Errou ou demorou?</strong> -1 ponto (mínimo zero).</div>
+      <div class="howto-text"><strong>Errou ou demorou?</strong> -1 ponto e você recebe um <strong>debuff</strong> que dificulta a defesa da bola (raquete minúscula por 6 segundos).</div>
     </div>
     <div class="howto-row">
       <div class="howto-icon">⏱</div>
@@ -4505,12 +4569,12 @@ function closeLeaderboard() {
   <div class="howto-section">
     <div class="howto-title">🧮 CONTEÚDO MATEMÁTICO</div>
     <div class="howto-row">
-      <div class="howto-icon">📚</div>
-      <div class="howto-text">As perguntas são do <strong>currículo da sua série</strong>: frações, equações, potências, logaritmos, trigonometria e muito mais.</div>
+      <div class="howto-icon">🧠</div>
+      <div class="howto-text">As perguntas são <strong>variadas</strong> e feitas para resolver de cabeça — somas, multiplicações, metades, dobros, sequências, porcentagens fáceis e mais. Nenhum cálculo no papel necessário!</div>
     </div>
     <div class="howto-row">
-      <div class="howto-icon">⚙️</div>
-      <div class="howto-text">Configure o nível em <strong>⚙ CONFIGURAR</strong> para perguntas mais fáceis ou difíceis.</div>
+      <div class="howto-icon">⏱</div>
+      <div class="howto-text">Você tem <strong>10 segundos</strong> para responder. Pense rápido!</div>
     </div>
   </div>
 
