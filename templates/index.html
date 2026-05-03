@@ -2211,7 +2211,6 @@ function drawBallRect(bx, by) {
     ctx.strokeStyle = 'rgba(255,255,255,0.4)';
     ctx.lineWidth = 1;
     ctx.stroke();
-  }
 
   } else if (skin === 'fire') {
     ctx.shadowColor = '#ff6600';
@@ -2272,6 +2271,8 @@ function drawBallRect(bx, by) {
 
   ctx.restore();
 }
+
+function updateParticles() {
   particles = particles.filter(p => p.life > 0);
   // Cap particle count to avoid spiral death on mobile
   if (particles.length > (IS_MOBILE ? 40 : 80)) particles.splice(0, particles.length - (IS_MOBILE ? 40 : 80));
