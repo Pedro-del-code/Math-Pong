@@ -249,13 +249,12 @@ html, body {
   color:#fff;
   font-family: 'Orbitron', sans-serif;
   overflow: hidden;
-  touch-action: none;
-  /* Prevent elastic scroll bleed on iOS */
+  touch-action: pan-x pan-y; /* permite toque em botões; 'none' bloqueava tudo no mobile */
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
 }
 
-canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%; }
+canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%; touch-action: none; }
 
 /* ── SCANLINES ── */
 #scanlines {
