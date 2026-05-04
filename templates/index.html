@@ -451,6 +451,7 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
   font-weight: 700;
   letter-spacing: 1px;
   padding: 12px 4px;
+  min-height: 64px;
   background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.07);
   border-radius: 12px;
@@ -460,10 +461,12 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
   -webkit-tap-highlight-color: transparent;
   transition: all .18s;
   display: flex; flex-direction: column;
-  align-items: center; gap: 5px;
+  align-items: center; justify-content: center; gap: 5px;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .btn-action .btn-icon { font-size: 18px; line-height: 1; }
-.btn-action:active {
+.btn-action:active, .btn-action.pressed {
   background: rgba(255,255,255,0.07);
   color: rgba(255,255,255,0.55);
   transform: scale(0.95);
@@ -1526,15 +1529,16 @@ canvas#c { display:block; position:fixed; top:0; left:0; width:100%; height:100%
 
     <!-- SECONDARY -->
     <div class="menu-actions-row">
-      <button class="btn-action" onclick="showHowto()">
+      <button class="btn-action" onclick="SFX.menuBoop();showHowto()">
         <span class="btn-icon">❓</span>REGRAS
       </button>
-      <button class="btn-action" onclick="showLeaderboard()">
+      <button class="btn-action" onclick="SFX.menuBoop();showLeaderboard()">
         <span class="btn-icon">🏆</span>RANK
       </button>
+      <button class="btn-action" onclick="SFX.menuBoop();showSkins()" style="border-color:rgba(180,80,255,0.2);color:rgba(180,80,255,0.5);">
+        <span class="btn-icon">🎨</span>SKINS
+      </button>
     </div>
-
-    <button class="btn-skins" onclick="showSkins()">🎨 &nbsp;PERSONALIZAR SKINS</button>
   </div>
 
   <div id="menu-version">MATH PONG v1.0 &nbsp;•&nbsp; MULTIPLAYER</div>
@@ -2432,17 +2436,19 @@ function setupMobileBtn(btn, dir) {
     e.preventDefault();
     btn.classList.add('pressed');
     movePaddle(dir);
+    if (iv) clearInterval(iv);
     iv = setInterval(()=>movePaddle(dir), 16);
   };
   const stop = e => {
     btn.classList.remove('pressed');
     clearInterval(iv); iv=null;
   };
-  btn.addEventListener('touchstart', start, {passive:false});
-  btn.addEventListener('touchend',   stop,  {passive:false});
-  btn.addEventListener('mousedown',  start);
-  btn.addEventListener('mouseup',    stop);
-  btn.addEventListener('mouseleave', stop);
+  btn.addEventListener('touchstart',  start, {passive:false});
+  btn.addEventListener('touchend',    stop,  {passive:false});
+  btn.addEventListener('touchcancel', stop,  {passive:false});
+  btn.addEventListener('mousedown',   start);
+  btn.addEventListener('mouseup',     stop);
+  btn.addEventListener('mouseleave',  stop);
 }
 setupMobileBtn(btnUp,   -1);
 setupMobileBtn(btnDown,  1);
@@ -2458,14 +2464,15 @@ setupMobileBtn(btnDown,  1);
     if (lastY === null) return;
     const dy = e.touches[0].clientY - lastY;
     lastY = e.touches[0].clientY;
-    // Convert pixel delta to game coords
-    const delta = dy / (window.innerHeight * 0.44);
-    movePaddle(delta > 0 ? 1 : -1);
-    // call multiple times for faster response
-    const speed = Math.abs(delta) * 12;
-    for (let i = 0; i < Math.round(speed); i++) movePaddle(delta > 0 ? 1 : -1);
+    // Convert pixel delta to game coords proportionally
+    const delta = dy / (window.innerHeight * 0.5);
+    const steps = Math.max(1, Math.round(Math.abs(delta) * 18));
+    const dir = delta > 0 ? 1 : -1;
+    for (let i = 0; i < steps; i++) movePaddle(dir);
   }, {passive:true});
-  zone.addEventListener('touchend', () => { lastY = null; }, {passive:true});
+  const resetSwipe = () => { lastY = null; };
+  zone.addEventListener('touchend',    resetSwipe, {passive:true});
+  zone.addEventListener('touchcancel', resetSwipe, {passive:true});
 })();
 
 // Show swipe zone during game
@@ -3800,7 +3807,7 @@ socket.on('math_debuff', data => {
   }
 });
 
-
+socket.on('effect_freeze', () => {
   showEffectToast('🧊 Bola congelada por 2s!', 2000);
   addEffectBadge('freeze', '🧊', 'Bola congelada!', 2000, '#88ddff');
 });
@@ -3963,7 +3970,6 @@ if (_serieSelEl) _serieSelEl.addEventListener('change', () => {
 
 // ══ COMO JOGAR ════════════════════════════════════════════════════════════════
 function showHowto() {
-  SFX.menuBoop();
   stopMenuPreview();
   hide('screen-menu');
   show('screen-howto');
