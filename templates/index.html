@@ -1136,34 +1136,22 @@ const MAT = {};
 function initThree() {
   const canvas = document.getElementById('three-canvas');
 
-  threeRenderer = new THREE.WebGLRenderer({ canvas, antialias: !IS_MOBILE, alpha: false });
+  threeRenderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false });
   threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_MOBILE ? 1.5 : 2));
   threeRenderer.setSize(window.innerWidth, window.innerHeight);
-  threeRenderer.shadowMap.enabled = !IS_MOBILE;
-  threeRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  threeRenderer.shadowMap.enabled = false;
   threeRenderer.toneMapping = THREE.ACESFilmicToneMapping;
   threeRenderer.toneMappingExposure = 1.2;
 
   threeScene = new THREE.Scene();
-  const isPortrait0 = window.innerHeight > window.innerWidth;
-  threeScene.fog = new THREE.FogExp2(0x000408, isPortrait0 ? 0.03 : 0.08);
+  threeScene.fog = new THREE.FogExp2(0x000408, 0.04);
 
-  // Camera — adapts to portrait vs landscape
-  const isPortrait = window.innerHeight > window.innerWidth;
+  // Camera — always top-down orthographic-style perspective
+  // Arena is 24 wide (X) × 8 deep (Z). We need to fit it in the viewport.
   threeCamera = new THREE.PerspectiveCamera(
-    isPortrait ? 60 : 50,
-    window.innerWidth / window.innerHeight, 0.1, 120
+    _calcFOV(), window.innerWidth / window.innerHeight, 0.1, 120
   );
-  // Portrait: camera straight above, looking down
-  // Landscape: classic perspective from behind
-  if (isPortrait) {
-    threeCamera.position.set(0, 20, 0);
-    threeCamera.lookAt(0, 0, 0);
-    threeCamera.up.set(0, 0, -1);
-  } else {
-    threeCamera.position.set(0, 6, 12);
-    threeCamera.lookAt(0, 0, 0);
-  }
+  _positionCamera();
 
   buildArena();
   buildPaddlesAndBall();
@@ -1173,63 +1161,58 @@ function initThree() {
   threeLoop();
 }
 
+// Calculate FOV so the 24-unit wide arena always fits in the viewport
+function _calcFOV() {
+  const aspect = window.innerWidth / window.innerHeight;
+  // Arena half-width in X = 12, half-depth in Z = 4.5, camera height = 16
+  // For landscape: fit width.  For portrait: fit height (which is narrower in world terms).
+  if (aspect < 1) {
+    // Portrait: arena 24 wide, screen narrow — increase FOV to see all of it
+    // tan(fov/2) = 12 / 16 → fov = 2*atan(12/16) → ~73° but pad it
+    return Math.min(88, Math.round(2 * Math.atan2(13, 16) * 180 / Math.PI));
+  }
+  return 55;
+}
+
+function _positionCamera() {
+  threeCamera.position.set(0, 16, 0);
+  threeCamera.up.set(0, 0, -1);
+  threeCamera.lookAt(0, 0, 0);
+}
+
 function onThreeResize() {
-  const isPortrait = window.innerHeight > window.innerWidth;
-  threeCamera.fov = isPortrait ? 60 : 50;
+  threeCamera.fov = _calcFOV();
   threeCamera.aspect = window.innerWidth / window.innerHeight;
   threeCamera.updateProjectionMatrix();
   threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_MOBILE ? 1.5 : 2));
   threeRenderer.setSize(window.innerWidth, window.innerHeight);
-  // Reposition camera for new orientation
-  if (isPortrait) {
-    threeCamera.position.set(0, 20, 0);
-    threeCamera.up.set(0, 0, -1);
-  } else {
-    threeCamera.position.set(0, 6, 12);
-    threeCamera.up.set(0, 1, 0);
-  }
-  threeCamera.lookAt(0, 0, 0);
-  // Update BASE_CAM
-  BASE_CAM.x = 0;
-  BASE_CAM.y = isPortrait ? 20 : 6;
-  BASE_CAM.z = isPortrait ? 0 : 12;
+  _positionCamera();
+  BASE_CAM.x = 0; BASE_CAM.y = 16; BASE_CAM.z = 0;
 }
 
 function buildLighting() {
-  // Ambient
-  const amb = new THREE.AmbientLight(0x050818, 1.0);
+  // Strong ambient so top-down view looks good
+  const amb = new THREE.AmbientLight(0x223355, 2.5);
   threeScene.add(amb);
 
-  // Main directional
-  const dir = new THREE.DirectionalLight(0x00eeff, 0.8);
-  dir.position.set(0, 10, 5);
-  if (!IS_MOBILE) {
-    dir.castShadow = true;
-    dir.shadow.mapSize.width = 1024;
-    dir.shadow.mapSize.height = 1024;
-    dir.shadow.camera.near = 0.1;
-    dir.shadow.camera.far = 40;
-    dir.shadow.camera.left = -12;
-    dir.shadow.camera.right = 12;
-    dir.shadow.camera.top = 8;
-    dir.shadow.camera.bottom = -8;
-    dir.shadow.bias = -0.001;
-  }
+  // Main directional from above
+  const dir = new THREE.DirectionalLight(0x99ddff, 1.2);
+  dir.position.set(0, 20, 0);
   threeScene.add(dir);
 
   // Cyan accent — left side (P1)
-  const pL = new THREE.PointLight(0x00eeff, 2.5, 14);
-  pL.position.set(-9, 2, 0);
+  const pL = new THREE.PointLight(0x00eeff, 4.0, 18);
+  pL.position.set(-9, 1, 0);
   threeScene.add(pL);
 
   // Red accent — right side (P2)
-  const pR = new THREE.PointLight(0xff4466, 2.5, 14);
-  pR.position.set(9, 2, 0);
+  const pR = new THREE.PointLight(0xff4466, 4.0, 18);
+  pR.position.set(9, 1, 0);
   threeScene.add(pR);
 
   // Center top — gold
-  const pC = new THREE.PointLight(0xffcc00, 1.2, 12);
-  pC.position.set(0, 4, 0);
+  const pC = new THREE.PointLight(0xffcc00, 2.0, 14);
+  pC.position.set(0, 2, 0);
   threeScene.add(pC);
 
   window._threePointL = pL;
@@ -1241,21 +1224,19 @@ function buildArena() {
   // Floor — dark reflective surface
   const floorGeo = new THREE.PlaneGeometry(24, 14);
   const floorMat = new THREE.MeshStandardMaterial({
-    color: 0x010812,
-    roughness: 0.2,
-    metalness: 0.8,
-    envMapIntensity: 0.5,
+    color: 0x020d1a,
+    roughness: 0.4,
+    metalness: 0.6,
   });
   threeFloor = new THREE.Mesh(floorGeo, floorMat);
   threeFloor.rotation.x = -Math.PI / 2;
   threeFloor.position.y = -0.5;
-  if (!IS_MOBILE) threeFloor.receiveShadow = true;
   threeScene.add(threeFloor);
 
-  // Grid lines on floor
-  const gridHelper = new THREE.GridHelper(20, 20, 0x00eeff, 0x001122);
+  // Grid lines on floor — brighter for top-down
+  const gridHelper = new THREE.GridHelper(22, 22, 0x00eeff, 0x002244);
   gridHelper.position.y = -0.49;
-  gridHelper.material.opacity = 0.12;
+  gridHelper.material.opacity = 0.25;
   gridHelper.material.transparent = true;
   threeScene.add(gridHelper);
 
@@ -1550,8 +1531,7 @@ const BALL_SKINS_3D = {
     emoji: '✖',
     build() {
       const g = new THREE.Group();
-      const mat = new THREE.MeshStandardMaterial({ color: 0x9b8fe8, emissive: 0x6644cc, emissiveIntensity: 1.2, roughness: 0.2, metalness: 0.3 });
-      // Two crossing bars
+      const mat = new THREE.MeshStandardMaterial({ color: 0x9b8fe8, emissive: 0x6644cc, emissiveIntensity: 3.0, roughness: 0.2, metalness: 0.3 });
       const bar1 = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.18, 0.18), mat);
       bar1.rotation.z = Math.PI / 4;
       g.add(bar1);
@@ -1568,7 +1548,7 @@ const BALL_SKINS_3D = {
       const g = new THREE.Group();
       const sphere = new THREE.Mesh(
         new THREE.SphereGeometry(0.3, 24, 24),
-        new THREE.MeshStandardMaterial({ color: 0x00eeff, emissive: 0x0066aa, emissiveIntensity: 0.8, roughness: 0.05, metalness: 0.9 })
+        new THREE.MeshStandardMaterial({ color: 0x00eeff, emissive: 0x0066aa, emissiveIntensity: 3.0, roughness: 0.05, metalness: 0.9 })
       );
       g.add(sphere);
       return g;
@@ -1633,16 +1613,16 @@ const BALL_SKINS_3D = {
     build() {
       const g = new THREE.Group();
       const nucleus = new THREE.Mesh(
-        new THREE.SphereGeometry(0.12, 12, 12),
-        new THREE.MeshStandardMaterial({ color: 0x00ff88, emissive: 0x00cc44, emissiveIntensity: 1.2 })
+        new THREE.SphereGeometry(0.18, 12, 12),
+        new THREE.MeshStandardMaterial({ color: 0x00ff88, emissive: 0x00cc44, emissiveIntensity: 2.0 })
       );
       g.add(nucleus);
-      // 3 orbital rings
-      const ringMat = new THREE.MeshStandardMaterial({ color: 0x00ff88, emissive: 0x00ff88, emissiveIntensity: 0.8, roughness: 0.1 });
+      // 3 orbital rings — bigger and more visible from top
+      const ringMat = new THREE.MeshStandardMaterial({ color: 0x00ff88, emissive: 0x00ff88, emissiveIntensity: 1.5, roughness: 0.1 });
       for (let i = 0; i < 3; i++) {
         const ring = new THREE.Mesh(
-          new THREE.TorusGeometry(0.28, 0.025, 8, 32),
-          ringMat
+          new THREE.TorusGeometry(0.36, 0.04, 8, 32),
+          ringMat.clone()
         );
         ring.rotation.set(i * Math.PI / 3, i * Math.PI / 4, 0);
         g.add(ring);
@@ -1674,12 +1654,18 @@ const BALL_SKINS_3D = {
     emoji: 'π',
     build() {
       const g = new THREE.Group();
-      // Gold sphere with PI embossed look
       const sphere = new THREE.Mesh(
         new THREE.SphereGeometry(0.28, 20, 20),
-        new THREE.MeshStandardMaterial({ color: 0xffcc00, emissive: 0xffaa00, emissiveIntensity: 0.8, roughness: 0.15, metalness: 0.6 })
+        new THREE.MeshStandardMaterial({ color: 0xffcc00, emissive: 0xffaa00, emissiveIntensity: 2.0, roughness: 0.15, metalness: 0.6 })
       );
       g.add(sphere);
+      // Add a flat glowing ring so it looks like π from above
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(0.38, 0.05, 8, 32),
+        new THREE.MeshStandardMaterial({ color: 0xffcc00, emissive: 0xffdd00, emissiveIntensity: 2.0 })
+      );
+      ring.rotation.x = Math.PI / 2; // flat ring visible from top
+      g.add(ring);
       return g;
     }
   },
@@ -1690,7 +1676,7 @@ let selectedPaddleSkin = localStorage.getItem('mathpong_paddle_skin') || 'neon';
 let selectedBallSkin   = localStorage.getItem('mathpong_ball_skin')   || 'xmark';
 
 function buildPaddlesAndBall() {
-  if (!threeScene) return; // guard: Three.js not yet initialized
+  if (!threeScene) return;
   // Remove old
   if (threePaddle0) { threeScene.remove(threePaddle0); }
   if (threePaddle1) { threeScene.remove(threePaddle1); }
@@ -1700,18 +1686,22 @@ function buildPaddlesAndBall() {
 
   threePaddle0 = skinDef.build(0x00eeff);
   threePaddle0.position.set(-9, 0, 0);
-  if (!IS_MOBILE) threePaddle0.traverse(m => { if (m.isMesh) m.castShadow = true; });
+  // Rotate paddle to lie flat — visible from top-down
+  // Original paddles are tall (Y axis). Rotate so height goes along Z axis.
+  threePaddle0.rotation.x = Math.PI / 2;
+  threePaddle0.scale.set(1.5, 1.2, 1.2); // scale up for visibility
   threeScene.add(threePaddle0);
 
   threePaddle1 = skinDef.build(0xff4466);
   threePaddle1.position.set(9, 0, 0);
-  if (!IS_MOBILE) threePaddle1.traverse(m => { if (m.isMesh) m.castShadow = true; });
+  threePaddle1.rotation.x = Math.PI / 2;
+  threePaddle1.scale.set(1.5, 1.2, 1.2);
   threeScene.add(threePaddle1);
 
   const ballDef = BALL_SKINS_3D[selectedBallSkin] || BALL_SKINS_3D['xmark'];
   threeBall = ballDef.build();
-  threeBall.position.set(0, 0.1, 0);
-  if (!IS_MOBILE) threeBall.traverse(m => { if (m.isMesh) m.castShadow = true; });
+  threeBall.position.set(0, 0.3, 0);
+  threeBall.scale.setScalar(1.6); // bigger for top-down visibility
   threeScene.add(threeBall);
 }
 
@@ -1813,7 +1803,7 @@ let ballRotSpeed = { x: 0.03, y: 0.05, z: 0.02 };
 
 // ── CAMERA CINEMATIC ─────────────────────────────────────────────────────────
 let camShake = 0;
-let BASE_CAM = { x: 0, y: IS_MOBILE ? 20 : 6, z: IS_MOBILE ? 0 : 12 };
+let BASE_CAM = { x: 0, y: 16, z: 0 };
 
 // ── MAIN RENDER LOOP ─────────────────────────────────────────────────────────
 let globalTime = 0;
@@ -1834,14 +1824,8 @@ function threeLoop() {
 
   // Camera shake on goal
   if (camShake > 0) {
-    const isPortrait = window.innerHeight > window.innerWidth;
-    if (isPortrait) {
-      threeCamera.position.x = BASE_CAM.x + (Math.random() - 0.5) * camShake * 0.4;
-      threeCamera.position.z = BASE_CAM.z + (Math.random() - 0.5) * camShake * 0.4;
-    } else {
-      threeCamera.position.x = BASE_CAM.x + (Math.random() - 0.5) * camShake * 0.3;
-      threeCamera.position.y = BASE_CAM.y + (Math.random() - 0.5) * camShake * 0.15;
-    }
+    threeCamera.position.x = BASE_CAM.x + (Math.random() - 0.5) * camShake * 0.5;
+    threeCamera.position.z = BASE_CAM.z + (Math.random() - 0.5) * camShake * 0.5;
     camShake -= 0.06;
   } else {
     threeCamera.position.x += (BASE_CAM.x - threeCamera.position.x) * 0.1;
@@ -1859,7 +1843,8 @@ function threeLoop() {
       const tz = gameToThreeZ(p0y);
       threePaddle0.position.z += (tz - threePaddle0.position.z) * 0.25;
       const ts = paddleScaleP0;
-      threePaddle0.scale.y += (ts - threePaddle0.scale.y) * 0.1;
+      // After rotation.x=PI/2, Y scale controls the Z spread (paddle width)
+      threePaddle0.scale.set(1.5, ts * 1.2, 1.2);
       // Glow hit
       if (paddleHitGlow[0] > 0) {
         threePaddle0.traverse(m => { if (m.isMesh && m.material.emissive) m.material.emissiveIntensity = 0.8 + paddleHitGlow[0] * 2; });
@@ -1870,7 +1855,7 @@ function threeLoop() {
       const tz = gameToThreeZ(p1y);
       threePaddle1.position.z += (tz - threePaddle1.position.z) * 0.25;
       const ts = paddleScaleP1;
-      threePaddle1.scale.y += (ts - threePaddle1.scale.y) * 0.1;
+      threePaddle1.scale.set(1.5, ts * 1.2, 1.2);
       if (paddleHitGlow[1] > 0) {
         threePaddle1.traverse(m => { if (m.isMesh && m.material.emissive) m.material.emissiveIntensity = 0.8 + paddleHitGlow[1] * 2; });
         paddleHitGlow[1] -= 0.1;
@@ -3082,10 +3067,7 @@ function goMenu() {
   // Reset arena visuals
   applyMap('arena');
   // Reset Three.js objects
-  if (threePaddle0) { threePaddle0.position.set(-9,0,0); threePaddle0.scale.set(1,1,1); }
-  if (threePaddle1) { threePaddle1.position.set(9,0,0); threePaddle1.scale.set(1,1,1); }
-  if (threeBall)    { threeBall.position.set(0,0.1,0); }
-  buildPaddlesAndBall();
+  buildPaddlesAndBall(); // rebuilds with correct rotation/scale
 }
 
 // (initThree already calls buildPaddlesAndBall internally)
