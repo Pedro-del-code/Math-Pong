@@ -63,8 +63,17 @@
   .btn-secondary { padding: 8px 16px !important; font-size: 9px !important; }
   #screen-menu { flex-direction: row; flex-wrap: wrap; gap: 8px; padding: 8px; align-items: center; justify-content: center; }
   .menu-logo { width: 100%; text-align: center; }
-  .ctrl-btn { width: 60px !important; height: 60px !important; font-size: 18px !important; }
-  #mobile-controls { padding-bottom: 4px !important; padding-top: 4px !important; }
+  /* Landscape gameplay: botões bem maiores para acertar com o polegar */
+  .ctrl-btn { width: 76px !important; height: 76px !important; font-size: 28px !important; }
+  #mobile-controls {
+    padding-bottom: 6px !important;
+    padding-top: 6px !important;
+    gap: clamp(48px, 12vw, 90px) !important;
+  }
+  /* Swipe zone ocupa tudo exceto HUD e controles */
+  #swipe-zone {
+    bottom: max(88px, calc(88px + env(safe-area-inset-bottom, 0px))) !important;
+  }
   #screen-howto, #screen-skins, #screen-leaderboard {
     overflow-y: auto !important; padding: 8px !important; justify-content: flex-start !important;
   }
@@ -1158,24 +1167,30 @@ function initThree() {
   buildLighting();
 
   window.addEventListener('resize', onThreeResize);
+  // iOS às vezes não dispara 'resize' na virada — forçar com orientationchange
+  window.addEventListener('orientationchange', () => setTimeout(onThreeResize, 350));
   threeLoop();
 }
 
 // Calculate FOV so the 24-unit wide arena always fits in the viewport
 function _calcFOV() {
   const aspect = window.innerWidth / window.innerHeight;
-  // Arena half-width in X = 12, half-depth in Z = 4.5, camera height = 16
-  // For landscape: fit width.  For portrait: fit height (which is narrower in world terms).
   if (aspect < 1) {
     // Portrait: arena 24 wide, screen narrow — increase FOV to see all of it
-    // tan(fov/2) = 12 / 16 → fov = 2*atan(12/16) → ~73° but pad it
     return Math.min(88, Math.round(2 * Math.atan2(13, 16) * 180 / Math.PI));
   }
-  return 55;
+  // Landscape: arena é 24u wide, câmera a Y=18. Calcular FOV vertical necessário
+  // para que o horizontal (24u) caiba. fovH = 2*atan(12/camY). fovV = 2*atan(tan(fovH/2)/aspect)
+  const camY = 18;
+  const halfFovH = Math.atan2(13, camY); // 13 = metade da arena + margem
+  const halfFovV = Math.atan(Math.tan(halfFovH) / aspect);
+  return Math.min(90, Math.max(55, Math.round(halfFovV * 2 * 180 / Math.PI)));
 }
 
 function _positionCamera() {
-  threeCamera.position.set(0, 16, 0);
+  const isLandscape = window.innerWidth > window.innerHeight;
+  const camY = isLandscape ? 18 : 16;
+  threeCamera.position.set(0, camY, 0);
   threeCamera.up.set(0, 0, -1);
   threeCamera.lookAt(0, 0, 0);
 }
@@ -1187,7 +1202,8 @@ function onThreeResize() {
   threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_MOBILE ? 1.5 : 2));
   threeRenderer.setSize(window.innerWidth, window.innerHeight);
   _positionCamera();
-  BASE_CAM.x = 0; BASE_CAM.y = 16; BASE_CAM.z = 0;
+  const isLandscape = window.innerWidth > window.innerHeight;
+  BASE_CAM.x = 0; BASE_CAM.y = isLandscape ? 18 : 16; BASE_CAM.z = 0;
 }
 
 function buildLighting() {
@@ -2717,7 +2733,9 @@ function activateSwipeZone() {
     const dy  = e.touches[0].clientY - lastY;
     lastY = e.touches[0].clientY;
     const dir = dy > 0 ? 1 : -1;
-    movePaddle(dir * Math.min(1, Math.abs(dy) / 20));
+    // Em landscape a arena parece mais comprimida — swipe mais sensível
+    const sensitivity = window.innerWidth > window.innerHeight ? 11 : 20;
+    movePaddle(dir * Math.min(1, Math.abs(dy) / sensitivity));
   };
 }
 function deactivateSwipeZone() {
