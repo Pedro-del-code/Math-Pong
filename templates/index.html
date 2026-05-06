@@ -469,6 +469,31 @@ html, body {
   background: linear-gradient(to top, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.5) 70%, transparent 100%);
   z-index:60;
 }
+/* Em portrait: botões nas laterais verticalmente centralizados */
+@media (orientation: portrait) and (pointer: coarse) {
+  #mobile-controls {
+    flex-direction: column;
+    width: auto;
+    height: auto;
+    bottom: auto;
+    left: auto;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    gap: clamp(20px, 5vw, 36px);
+    padding: 16px 10px;
+    background: rgba(0,0,0,0.6);
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.06);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .ctrl-btn {
+    width: clamp(60px, 14vw, 80px) !important;
+    height: clamp(60px, 14vw, 80px) !important;
+    font-size: clamp(22px, 6vw, 32px) !important;
+  }
+}
 .ctrl-btn {
   font-family:'Orbitron', sans-serif;
   font-size:clamp(16px, 4vw, 28px); font-weight:900;
@@ -497,7 +522,14 @@ html, body {
   width:100%;
   z-index:55; display:none;
 }
-
+/* Portrait: swipe zone não cobre os botões laterais direitos */
+@media (orientation: portrait) and (pointer: coarse) {
+  #swipe-zone {
+    bottom: 0 !important;
+    right: clamp(90px, 20vw, 110px); /* deixa espaço para o painel de botões */
+    width: auto;
+  }
+}
 /* ── MATH OVERLAY ── */
 #math-overlay {
   position:fixed; inset:0; z-index:200;
@@ -1172,27 +1204,39 @@ function initThree() {
   threeLoop();
 }
 
-// Calculate FOV so the 24-unit wide arena always fits in the viewport
+// Calculate FOV so the arena sempre caiba no viewport
 function _calcFOV() {
   const aspect = window.innerWidth / window.innerHeight;
   if (aspect < 1) {
-    // Portrait: arena 24 wide, screen narrow — increase FOV to see all of it
-    return Math.min(88, Math.round(2 * Math.atan2(13, 16) * 180 / Math.PI));
+    // Portrait: câmera rotacionada 90° — arena 8.4u wide (Z) fica na horizontal da tela
+    // e 18u tall (X) fica na vertical. Precisamos ver Z=±4.5 na horizontal.
+    // fovH = 2*atan(5/camY), fovV = 2*atan(tan(fovH/2)/aspect)
+    const camY = 16;
+    const halfFovH = Math.atan2(5, camY);
+    const halfFovV = Math.atan(Math.tan(halfFovH) / aspect);
+    return Math.min(90, Math.max(44, Math.round(halfFovV * 2 * 180 / Math.PI)));
   }
-  // Landscape: arena é 24u wide, câmera a Y=18. Calcular FOV vertical necessário
-  // para que o horizontal (24u) caiba. fovH = 2*atan(12/camY). fovV = 2*atan(tan(fovH/2)/aspect)
+  // Landscape: arena 24u wide (X) na horizontal da tela
   const camY = 18;
-  const halfFovH = Math.atan2(13, camY); // 13 = metade da arena + margem
+  const halfFovH = Math.atan2(13, camY);
   const halfFovV = Math.atan(Math.tan(halfFovH) / aspect);
   return Math.min(90, Math.max(55, Math.round(halfFovV * 2 * 180 / Math.PI)));
 }
 
 function _positionCamera() {
   const isLandscape = window.innerWidth > window.innerHeight;
-  const camY = isLandscape ? 18 : 16;
-  threeCamera.position.set(0, camY, 0);
-  threeCamera.up.set(0, 0, -1);
-  threeCamera.lookAt(0, 0, 0);
+  if (isLandscape) {
+    // Landscape: câmera top-down normal, arena horizontal na tela
+    threeCamera.position.set(0, 18, 0);
+    threeCamera.up.set(0, 0, -1);
+    threeCamera.lookAt(0, 0, 0);
+  } else {
+    // Portrait: rotacionar câmera 90° — eixo X da arena vira vertical na tela
+    // Câmera ainda olha de cima (Y), mas "up" vira o eixo X
+    threeCamera.position.set(0, 16, 0);
+    threeCamera.up.set(1, 0, 0);  // "cima" da tela aponta para X+ → arena gira 90°
+    threeCamera.lookAt(0, 0, 0);
+  }
 }
 
 function onThreeResize() {
