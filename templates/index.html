@@ -417,6 +417,10 @@ html, body {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
+@media (max-width: 480px) {
+  #scores { gap: 16px; padding: max(8px, env(safe-area-inset-top, 8px)) 16px 8px; }
+  :root { --hud-h: 48px; }
+}
 #game-timer {
   font-family:'Share Tech Mono', monospace;
   font-size:clamp(18px,5.5vw,26px); font-weight:700;
@@ -451,15 +455,15 @@ html, body {
 #mobile-controls {
   position:fixed; bottom:0; left:0; width:100%;
   display:flex; justify-content:center; gap:clamp(16px, 4vw, 40px);
-  padding:clamp(10px,2vw,16px) 24px;
-  padding-bottom: max(clamp(20px,4vw,36px), env(safe-area-inset-bottom, 20px));
+  padding:clamp(8px,1.5vw,12px) 24px;
+  padding-bottom: max(clamp(16px,4vw,28px), env(safe-area-inset-bottom, 16px));
   background: linear-gradient(to top, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.5) 70%, transparent 100%);
   z-index:60;
 }
 .ctrl-btn {
   font-family:'Orbitron', sans-serif;
-  font-size:clamp(18px, 4vw, 28px); font-weight:900;
-  width:clamp(72px, 14vw, 110px); height:clamp(72px, 14vw, 110px);
+  font-size:clamp(16px, 4vw, 28px); font-weight:900;
+  width:clamp(64px, 13vw, 100px); height:clamp(64px, 13vw, 100px);
   border-radius:18px;
   border: 1px solid rgba(255,255,255,0.07);
   background: rgba(255,255,255,0.03);
@@ -480,7 +484,7 @@ html, body {
 }
 #swipe-zone {
   position:fixed; top:var(--hud-h,62px); left:0;
-  bottom:max(clamp(120px,20vw,160px), calc(clamp(120px,20vw,160px) + env(safe-area-inset-bottom, 0px)));
+  bottom:max(clamp(96px,17vw,130px), calc(clamp(96px,17vw,130px) + env(safe-area-inset-bottom, 0px)));
   width:100%;
   z-index:55; display:none;
 }
@@ -1141,13 +1145,25 @@ function initThree() {
   threeRenderer.toneMappingExposure = 1.2;
 
   threeScene = new THREE.Scene();
-  threeScene.fog = new THREE.FogExp2(0x000408, 0.08);
+  const isPortrait0 = window.innerHeight > window.innerWidth;
+  threeScene.fog = new THREE.FogExp2(0x000408, isPortrait0 ? 0.03 : 0.08);
 
-  // Camera — slightly elevated perspective looking down at arena
-  threeCamera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
-  const isMobileLandscape = IS_MOBILE && window.innerWidth > window.innerHeight;
-  threeCamera.position.set(0, IS_MOBILE ? 7 : 6, IS_MOBILE ? 12 : 10);
-  threeCamera.lookAt(0, 0, 0);
+  // Camera — adapts to portrait vs landscape
+  const isPortrait = window.innerHeight > window.innerWidth;
+  threeCamera = new THREE.PerspectiveCamera(
+    isPortrait ? 60 : 50,
+    window.innerWidth / window.innerHeight, 0.1, 120
+  );
+  // Portrait: camera straight above, looking down
+  // Landscape: classic perspective from behind
+  if (isPortrait) {
+    threeCamera.position.set(0, 20, 0);
+    threeCamera.lookAt(0, 0, 0);
+    threeCamera.up.set(0, 0, -1);
+  } else {
+    threeCamera.position.set(0, 6, 12);
+    threeCamera.lookAt(0, 0, 0);
+  }
 
   buildArena();
   buildPaddlesAndBall();
@@ -1158,10 +1174,25 @@ function initThree() {
 }
 
 function onThreeResize() {
+  const isPortrait = window.innerHeight > window.innerWidth;
+  threeCamera.fov = isPortrait ? 60 : 50;
   threeCamera.aspect = window.innerWidth / window.innerHeight;
   threeCamera.updateProjectionMatrix();
   threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_MOBILE ? 1.5 : 2));
   threeRenderer.setSize(window.innerWidth, window.innerHeight);
+  // Reposition camera for new orientation
+  if (isPortrait) {
+    threeCamera.position.set(0, 20, 0);
+    threeCamera.up.set(0, 0, -1);
+  } else {
+    threeCamera.position.set(0, 6, 12);
+    threeCamera.up.set(0, 1, 0);
+  }
+  threeCamera.lookAt(0, 0, 0);
+  // Update BASE_CAM
+  BASE_CAM.x = 0;
+  BASE_CAM.y = isPortrait ? 20 : 6;
+  BASE_CAM.z = isPortrait ? 0 : 12;
 }
 
 function buildLighting() {
@@ -1782,7 +1813,7 @@ let ballRotSpeed = { x: 0.03, y: 0.05, z: 0.02 };
 
 // ── CAMERA CINEMATIC ─────────────────────────────────────────────────────────
 let camShake = 0;
-const BASE_CAM = { x: 0, y: IS_MOBILE ? 7 : 6, z: IS_MOBILE ? 12 : 10 };
+let BASE_CAM = { x: 0, y: IS_MOBILE ? 20 : 6, z: IS_MOBILE ? 0 : 12 };
 
 // ── MAIN RENDER LOOP ─────────────────────────────────────────────────────────
 let globalTime = 0;
@@ -1803,12 +1834,19 @@ function threeLoop() {
 
   // Camera shake on goal
   if (camShake > 0) {
-    threeCamera.position.x = BASE_CAM.x + (Math.random() - 0.5) * camShake * 0.3;
-    threeCamera.position.y = BASE_CAM.y + (Math.random() - 0.5) * camShake * 0.15;
+    const isPortrait = window.innerHeight > window.innerWidth;
+    if (isPortrait) {
+      threeCamera.position.x = BASE_CAM.x + (Math.random() - 0.5) * camShake * 0.4;
+      threeCamera.position.z = BASE_CAM.z + (Math.random() - 0.5) * camShake * 0.4;
+    } else {
+      threeCamera.position.x = BASE_CAM.x + (Math.random() - 0.5) * camShake * 0.3;
+      threeCamera.position.y = BASE_CAM.y + (Math.random() - 0.5) * camShake * 0.15;
+    }
     camShake -= 0.06;
   } else {
     threeCamera.position.x += (BASE_CAM.x - threeCamera.position.x) * 0.1;
     threeCamera.position.y += (BASE_CAM.y - threeCamera.position.y) * 0.1;
+    threeCamera.position.z += (BASE_CAM.z - threeCamera.position.z) * 0.1;
   }
   threeCamera.lookAt(0, 0, 0);
 
