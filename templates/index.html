@@ -1996,13 +1996,24 @@ function threeLoop(now) {
   if (gameRunning3D) {
     // ── Interpolação multiplayer (dentro do RAF, delta-time real) ──
     if (!aiMode && !gamePaused) {
-      // alpha = quão rápido converge. 18/s significa ~95% em ~167ms (bom para 60Hz server)
-      const ballAlpha  = 1 - Math.pow(1 - 0.85, dt * 60); // ~85% por frame a 60fps
-      const paddleAlpha = 1 - Math.pow(1 - 0.80, dt * 60);
-      window._ballX += (_ballTargetX - window._ballX) * ballAlpha;
-      window._ballY += (_ballTargetY - window._ballY) * ballAlpha;
+      // Paddle: lerp rápido para responsividade visual
+      const paddleAlpha = 1 - Math.pow(1 - 0.92, dt * 60); // ~92% por frame = muito responsivo
       oppPaddleY    += (_oppTargetY  - oppPaddleY)    * paddleAlpha;
       window._oppPaddleY = oppPaddleY;
+
+      // Bola: snap imediato se mudou de direção (evita atravessar paddle visualmente)
+      const prevVx = ballState._prevVx || 0;
+      const currVx = ballState.vx || 0;
+      const ballAlpha = 1 - Math.pow(1 - 0.90, dt * 60); // ~90% por frame
+      if (prevVx !== 0 && Math.sign(currVx) !== Math.sign(prevVx)) {
+        // Direção inverteu — snap direto para evitar "atravessar" paddle
+        window._ballX = _ballTargetX;
+        window._ballY = _ballTargetY;
+      } else {
+        window._ballX += (_ballTargetX - window._ballX) * ballAlpha;
+        window._ballY += (_ballTargetY - window._ballY) * ballAlpha;
+      }
+      ballState._prevVx = currVx;
     }
 
     // Sync paddle positions
@@ -2112,7 +2123,7 @@ window._ballY = 0;
 
 const PADDLE_H_CLIENT = 0.22;
 const BALL_R_CLIENT   = 0.025;
-const BALL_SPEED_CLIENT = 0.009;
+const BALL_SPEED_CLIENT = 0.018;  // aumentado de 0.009 — era lento demais a 60fps
 
 // ── AUDIO ────────────────────────────────────────────────────────────────────
 let _audioCtx = null;
@@ -2480,19 +2491,21 @@ socket.on('game_state', data => {
   if (aiMode) return;   // modo IA cuida do próprio estado, ignora pacotes de rede
   const b = data.ball;
 
+  // Detectar mudança de direção (colisão com paddle no servidor) → snap para evitar "atravessar"
+  const prevVx = ballState.vx || 0;
+  const dirChanged = prevVx !== 0 && Math.sign(b.vx) !== Math.sign(prevVx);
+
   // Atualiza o alvo de interpolação da bola
   _ballTargetX = b.x;
   _ballTargetY = b.y;
 
-  // Se a bola estava parada (pausa) e agora tem velocidade, snap imediato para evitar teletransporte
-  if (!gamePaused && (Math.abs(b.vx) > 0 || Math.abs(b.vy) > 0)) {
-    const distX = Math.abs(_ballTargetX - window._ballX);
-    const distY = Math.abs(_ballTargetY - window._ballY);
-    // Se a bola sumiu da tela (distância grande = glitch), snap direto
-    if (distX > 0.3 || distY > 0.3) {
-      window._ballX = _ballTargetX;
-      window._ballY = _ballTargetY;
-    }
+  // Snap imediato se: direção inverteu (colisão), bola estava parada, ou distância grande (teletransporte)
+  const distX = Math.abs(_ballTargetX - window._ballX);
+  const distY = Math.abs(_ballTargetY - window._ballY);
+  if (dirChanged || distX > 0.25 || distY > 0.25 ||
+      (!gamePaused && prevVx === 0 && (Math.abs(b.vx) > 0 || Math.abs(b.vy) > 0))) {
+    window._ballX = _ballTargetX;
+    window._ballY = _ballTargetY;
   }
 
   ballState.x = b.x; ballState.y = b.y;
@@ -2515,6 +2528,11 @@ socket.on('score_update', data => {
   scores = data.scores;
   document.querySelector('#s0 .score-val').textContent = scores[0];
   document.querySelector('#s1 .score-val').textContent = scores[1];
+
+  // Snap bola ao centro no novo saque — evita fantasma de interpolação
+  _ballTargetX = 0; _ballTargetY = 0;
+  window._ballX = 0; window._ballY = 0;
+  ballState._prevVx = 0;
 
   if (data.reset_effects) {
     reverseControls = false;
@@ -2714,6 +2732,7 @@ function hideMathOverlay() {
   if (!aiMode) {
     window._ballX = _ballTargetX;
     window._ballY = _ballTargetY;
+    ballState._prevVx = ballState.vx; // evita falso snap de colisão no próximo frame
   }
 }
 
@@ -2880,7 +2899,11 @@ function startCountdown() {
       SFX.countdown(step.text === 'GO!' ? 0 : parseInt(step.text));
     }, step.delay);
   });
-  setTimeout(() => { overlay.classList.remove('show'); gamePaused = false; _aiLastRAF = null; }, 3500);
+  setTimeout(() => {
+    overlay.classList.remove('show');
+    gamePaused = false;
+    _aiLastRAF = null; // reset timing so first frame after unpause doesn't accumulate huge dt
+  }, 3500);
 }
 
 // ── INPUT ─────────────────────────────────────────────────────────────────────
@@ -3068,7 +3091,10 @@ function startAIGame() {
       if (rawDt > 0.1) rawDt = 0.1;
 
       // Se pausado (math overlay, countdown, etc.) nao avanca timer nem fisica
-      if (gamePaused) return;
+      if (gamePaused) {
+        _aiLastRAF = null; // reset para evitar dt acumulado durante a pausa
+        return;
+      }
 
       // Timer
       if (!aiMathActive) {
