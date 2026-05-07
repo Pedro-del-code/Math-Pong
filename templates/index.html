@@ -2580,8 +2580,11 @@ socket.on('score_update', data => {
     // Condição de 2 pontos — encerra a partida
     if (scores[0] >= 2 || scores[1] >= 2) {
       const winIdx = scores[0] >= 2 ? 0 : 1;
+      const winnerName = winIdx === myIdx ? myName : (document.getElementById(winIdx===0?'label0':'label1')?.textContent || 'ADVERSÁRIO');
       setTimeout(() => {
-        showGameOver(winIdx === myIdx ? myName : 'ADVERSÁRIO', scores);
+        hide('hud'); hide('opponent-label'); hide('mobile-controls');
+        deactivateSwipeZone();
+        showWin({ winner_idx: winIdx, winner_name: winnerName, winner_turma: '', scores, leaderboard: [] });
       }, 900);
     }
   }
@@ -3188,7 +3191,11 @@ function aiPoint(scorerIdx) {
   if (scores[scorerIdx] >= 2) {
     if (aiInterval) { cancelAnimationFrame(aiInterval); aiInterval = null; }
     aiMode = false;
-    setTimeout(() => showGameOver(scorerIdx === 0 ? myName : 'I.A.', scores), 800);
+    setTimeout(() => {
+      hide('hud'); hide('opponent-label'); hide('mobile-controls');
+      deactivateSwipeZone();
+      showWin({ winner_idx: scorerIdx, winner_name: scorerIdx === 0 ? myName : 'I.A.', winner_turma: scorerIdx === 0 ? 'MODO TREINO' : 'COMPUTADOR', scores, leaderboard: [] });
+    }, 800);
     return;
   }
 
