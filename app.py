@@ -26,26 +26,21 @@ if SUPABASE_URL and SUPABASE_KEY:
 
 def db_get_or_create_player(name, turma):
     if not supabase:
-        return {'id': str(uuid.uuid4()), 'name': name, 'turma': turma, 'wins': 0}
+        return {'id': None, 'name': name, 'turma': turma, 'wins': 0}
     try:
-        res = supabase.table('players').select('*').eq('name', name).eq('turma', turma).execute()
+        res = supabase.rpc('upsert_player', {'p_name': name, 'p_turma': turma}).execute()
         if res.data:
             return res.data[0]
-        new = supabase.table('players').insert({'name': name, 'turma': turma, 'wins': 0}).execute()
-        return new.data[0]
     except Exception as e:
-        print(f'[DB] get_or_create_player error: {e}')
-        return {'id': str(uuid.uuid4()), 'name': name, 'turma': turma, 'wins': 0}
+        print(f'[DB] upsert_player error: {e}')
+    return {'id': None, 'name': name, 'turma': turma, 'wins': 0}
 
 
-def db_add_win(player_id):
-    if not supabase or not player_id:
+def db_add_win(player_name, player_turma):
+    if not supabase or not player_name:
         return
     try:
-        res = supabase.table('players').select('wins').eq('id', player_id).execute()
-        if res.data:
-            wins = res.data[0]['wins'] + 1
-            supabase.table('players').update({'wins': wins}).eq('id', player_id).execute()
+        supabase.rpc('add_win', {'p_name': player_name, 'p_turma': player_turma}).execute()
     except Exception as e:
         print(f'[DB] add_win error: {e}')
 
@@ -296,7 +291,7 @@ class GameRoom:
 
         # Salva no DB em background sem bloquear nada
         def save_result():
-            db_add_win(winner_info.get('id'))
+            db_add_win(winner_info.get('name'), winner_info.get('turma', ''))
         threading.Thread(target=save_result, daemon=True).start()
 
     # ── MATEMÁTICA ───────────────────────────────────────────────────────────
