@@ -1157,31 +1157,38 @@ function initThree() {
   threeLoop();
 }
 
-// Arena is 24 wide (X) × 8 deep (Z), centered at origin, floor at y=-0.5
-// Camera sits above and slightly back, looking straight down at origin
+// Arena is 24 wide (X) × 9 deep (Z), paddles at x=±9
+// Three.js camera FOV is VERTICAL. In portrait (narrow screen), horizontal FOV = vertical_fov * aspect
+// To see all 24 units wide: horizontal_fov_half must cover 12 units at camera height
+// horizontal_fov = 2*atan(tan(vfov/2) * aspect)
+// We need: tan(vfov/2) * aspect * camY >= 12
+// → tan(vfov/2) >= 12 / (aspect * camY)
 function _setCameraForViewport() {
-  // Place camera high above center — use FOV + height to frame the 24×8 arena
-  // We need tan(fov/2) * camHeight >= half the arena width in the narrowest screen dimension
-  const aspect = window.innerWidth / window.innerHeight;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const aspect = vw / vh;
   const isPortrait = aspect < 1;
 
-  // The arena is 24 wide. In portrait the screen width is the constraint.
-  // In landscape the screen height is the constraint (arena 8 deep).
-  // Use a high camera + wide FOV to see everything.
-  let camY, fov;
+  let camY;
   if (isPortrait) {
-    fov  = 80;
-    // tan(40°) * camY >= 12 (half arena width)  → camY >= 12/tan(40°) ≈ 14.3
-    camY = 15;
+    camY = 12;
+    // Need to cover ±7.5 horizontally (half-width 7 + paddle width ~0.5)
+    // horizontal coverage = tan(vfov/2) * aspect * camY >= 7.5
+    // tan(vfov/2) >= 7.5 / (aspect * camY)
+    const tanHalf = 8 / (aspect * camY);
+    const vfov = 2 * Math.atan(tanHalf) * (180 / Math.PI);
+    threeCamera.fov = Math.min(vfov, 160);
   } else {
-    fov  = 65;
-    camY = 13;
+    camY = 10;
+    // Cover ±4.5 deep (Z: arena depth ±3.8)
+    const tanHalf = 5 / camY;
+    const vfov = 2 * Math.atan(tanHalf) * (180 / Math.PI);
+    threeCamera.fov = Math.max(vfov + 8, 50);
   }
 
-  threeCamera.fov    = fov;
   threeCamera.aspect = aspect;
   threeCamera.updateProjectionMatrix();
-  threeCamera.position.set(0, camY, 0.01); // tiny z offset prevents gimbal lock
+  threeCamera.position.set(0, camY, 0.01);
   threeCamera.up.set(0, 0, -1);
   threeCamera.lookAt(0, 0, 0);
 
@@ -1207,12 +1214,12 @@ function buildLighting() {
 
   // Cyan accent — left side (P1 goal)
   const pL = new THREE.PointLight(0x00eeff, 5.0, 20);
-  pL.position.set(-9, 1, 0);
+  pL.position.set(-7, 1, 0);
   threeScene.add(pL);
 
   // Red accent — right side (P2 goal)
   const pR = new THREE.PointLight(0xff4466, 5.0, 20);
-  pR.position.set(9, 1, 0);
+  pR.position.set(7, 1, 0);
   threeScene.add(pR);
 
   // Center gold light
@@ -1226,50 +1233,48 @@ function buildLighting() {
 }
 
 function buildArena() {
-  // Floor
-  const floorGeo = new THREE.PlaneGeometry(26, 12);
-  const floorMat = new THREE.MeshStandardMaterial({
-    color: 0x020e1f, roughness: 0.5, metalness: 0.5,
-  });
+  // Floor — 16 wide × 9 deep (paddles at ±7)
+  const floorGeo = new THREE.PlaneGeometry(18, 10);
+  const floorMat = new THREE.MeshStandardMaterial({ color: 0x020e1f, roughness: 0.5, metalness: 0.5 });
   threeFloor = new THREE.Mesh(floorGeo, floorMat);
   threeFloor.rotation.x = -Math.PI / 2;
   threeFloor.position.y = -0.5;
   threeScene.add(threeFloor);
 
-  // Grid — visible from above
-  const gridHelper = new THREE.GridHelper(24, 24, 0x004466, 0x001122);
+  // Grid
+  const gridHelper = new THREE.GridHelper(16, 16, 0x004466, 0x001122);
   gridHelper.position.y = -0.48;
-  gridHelper.material.opacity = 0.35;
+  gridHelper.material.opacity = 0.4;
   gridHelper.material.transparent = true;
   threeScene.add(gridHelper);
 
   // Center dashed line
-  for (let i = -4.5; i <= 4.5; i += 1.1) {
+  for (let i = -4; i <= 4; i += 1.0) {
     const dMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(0.06, 0.04, 0.55),
+      new THREE.BoxGeometry(0.06, 0.04, 0.5),
       new THREE.MeshStandardMaterial({ color: 0x00eeff, emissive: 0x00eeff, emissiveIntensity: 1.5 })
     );
     dMesh.position.set(0, -0.46, i);
     threeScene.add(dMesh);
   }
 
-  // Top/bottom wall neon strips
-  buildWallStrip(0, -0.4, -4.8, 22, 0x00eeff);
-  buildWallStrip(0, -0.4,  4.8, 22, 0xff4466);
+  // Wall strips (top/bottom)
+  buildWallStrip(0, -0.4, -4.2, 17, 0x00eeff);
+  buildWallStrip(0, -0.4,  4.2, 17, 0xff4466);
 
-  // Goal zone glows
-  const gGeoL = new THREE.PlaneGeometry(1.5, 9.6);
-  const gMatL = new THREE.MeshStandardMaterial({ color: 0x00eeff, emissive: 0x00eeff, emissiveIntensity: 0.4, transparent: true, opacity: 0.07 });
-  const goalL = new THREE.Mesh(gGeoL, gMatL);
+  // Goal glow zones at ±7
+  const goalGeoL = new THREE.PlaneGeometry(1.5, 8.4);
+  const goalMatL = new THREE.MeshStandardMaterial({ color: 0x00eeff, emissive: 0x00eeff, emissiveIntensity: 0.5, transparent: true, opacity: 0.1 });
+  const goalL = new THREE.Mesh(goalGeoL, goalMatL);
   goalL.rotation.x = -Math.PI / 2;
-  goalL.position.set(-10.5, -0.45, 0);
+  goalL.position.set(-8.5, -0.45, 0);
   threeScene.add(goalL);
 
-  const gGeoR = new THREE.PlaneGeometry(1.5, 9.6);
-  const gMatR = new THREE.MeshStandardMaterial({ color: 0xff4466, emissive: 0xff4466, emissiveIntensity: 0.4, transparent: true, opacity: 0.07 });
-  const goalR = new THREE.Mesh(gGeoR, gMatR);
+  const goalGeoR = new THREE.PlaneGeometry(1.5, 8.4);
+  const goalMatR = new THREE.MeshStandardMaterial({ color: 0xff4466, emissive: 0xff4466, emissiveIntensity: 0.5, transparent: true, opacity: 0.1 });
+  const goalR = new THREE.Mesh(goalGeoR, goalMatR);
   goalR.rotation.x = -Math.PI / 2;
-  goalR.position.set(10.5, -0.45, 0);
+  goalR.position.set(8.5, -0.45, 0);
   threeScene.add(goalR);
 }
 
@@ -1678,28 +1683,26 @@ function buildPaddlesAndBall() {
   const skinDef = PADDLE_SKINS_3D[selectedPaddleSkin] || PADDLE_SKINS_3D['neon'];
 
   threePaddle0 = skinDef.build(0x00eeff);
-  threePaddle0.position.set(-9, 0.2, 0);
-  // No rotation — paddles are tall (Y), which maps to Z in top-down view correctly
-  // Scale: X=thickness, Y=height(visible as Z from top), Z=depth
-  threePaddle0.scale.set(0.8, 1.0, 0.8);
+  threePaddle0.position.set(-7, 0.5, 0);
+  threePaddle0.scale.set(1.2, 1.4, 1.2);
   threeScene.add(threePaddle0);
 
   threePaddle1 = skinDef.build(0xff4466);
-  threePaddle1.position.set(9, 0.2, 0);
-  threePaddle1.scale.set(0.8, 1.0, 0.8);
+  threePaddle1.position.set(7, 0.5, 0);
+  threePaddle1.scale.set(1.2, 1.4, 1.2);
   threeScene.add(threePaddle1);
 
   const ballDef = BALL_SKINS_3D[selectedBallSkin] || BALL_SKINS_3D['xmark'];
   threeBall = ballDef.build();
-  threeBall.position.set(0, 0.3, 0);
-  threeBall.scale.setScalar(1.4);
+  threeBall.position.set(0, 0.5, 0);
+  threeBall.scale.setScalar(1.8);
   threeScene.add(threeBall);
 }
 
 // ── COORDINATE MAPPING ───────────────────────────────────────────────────────
 // Game coords: x in [-1,1], y in [-1,1]  → Three coords: x in [-9,9], z in [-4.2,4.2]
-function gameToThreeX(gx) { return gx * 9; }
-function gameToThreeZ(gy) { return gy * 4.2; }
+function gameToThreeX(gx) { return gx * 7; }
+function gameToThreeZ(gy) { return gy * 3.8; }
 
 // ── TRAIL SYSTEM (3D) ────────────────────────────────────────────────────────
 const TRAIL_COUNT = IS_MOBILE ? 6 : 14;
@@ -1833,8 +1836,7 @@ function threeLoop() {
     if (threePaddle0) {
       const tz = gameToThreeZ(p0y);
       threePaddle0.position.z += (tz - threePaddle0.position.z) * 0.25;
-      const ts = paddleScaleP0;
-      threePaddle0.scale.set(0.8, ts, 0.8);
+      threePaddle0.scale.set(1.2, paddleScaleP0 * 1.4, 1.2);
       if (paddleHitGlow[0] > 0) {
         threePaddle0.traverse(m => { if (m.isMesh && m.material.emissive) m.material.emissiveIntensity = 0.8 + paddleHitGlow[0] * 2; });
         paddleHitGlow[0] -= 0.1;
@@ -1843,8 +1845,7 @@ function threeLoop() {
     if (threePaddle1) {
       const tz = gameToThreeZ(p1y);
       threePaddle1.position.z += (tz - threePaddle1.position.z) * 0.25;
-      const ts = paddleScaleP1;
-      threePaddle1.scale.set(0.8, ts, 0.8);
+      threePaddle1.scale.set(1.2, paddleScaleP1 * 1.4, 1.2);
       if (paddleHitGlow[1] > 0) {
         threePaddle1.traverse(m => { if (m.isMesh && m.material.emissive) m.material.emissiveIntensity = 0.8 + paddleHitGlow[1] * 2; });
         paddleHitGlow[1] -= 0.1;
@@ -2347,7 +2348,7 @@ socket.on('score_update', data => {
     camShake = 0.8; // 3D camera shake!
     // 3D particles at goal position
     spawnParticles3D(
-      data.scorer === 0 ? -9 : 9,
+      data.scorer === 0 ? -7 : 7,
       gameToThreeZ(0),
       data.scorer === 0 ? 0x00eeff : 0xff4466,
       IS_MOBILE ? 15 : 30
@@ -2909,7 +2910,7 @@ function aiPoint(scorerIdx) {
   SFX.goal(scorerIdx === 0);
   triggerGoalFlash(scorerIdx);
   camShake = 0.9;
-  spawnParticles3D(scorerIdx === 0 ? -9 : 9, 0, scorerIdx === 0 ? 0x00eeff : 0xff4466, IS_MOBILE ? 12 : 25);
+  spawnParticles3D(scorerIdx === 0 ? -7 : 7, 0, scorerIdx === 0 ? 0x00eeff : 0xff4466, IS_MOBILE ? 12 : 25);
   const el = document.querySelector(`#s${scorerIdx} .score-val`);
   if (el) { el.style.transform='scale(1.5)'; setTimeout(()=>el.style.transform='scale(1)',350); }
   paddleScaleP0=1.0; paddleScaleP1=1.0; reverseControls=false;
@@ -3119,8 +3120,8 @@ function goMenu() {
   // Reset arena visuals
   applyMap('arena');
   // Reset Three.js objects
-  if (threePaddle0) { threePaddle0.position.set(-9,0,0); threePaddle0.scale.set(1,1,1); }
-  if (threePaddle1) { threePaddle1.position.set(9,0,0); threePaddle1.scale.set(1,1,1); }
+  if (threePaddle0) { threePaddle0.position.set(-7,0,0); threePaddle0.scale.set(1,1,1); }
+  if (threePaddle1) { threePaddle1.position.set(7,0,0); threePaddle1.scale.set(1,1,1); }
   if (threeBall)    { threeBall.position.set(0,0.1,0); }
   buildPaddlesAndBall();
 }
