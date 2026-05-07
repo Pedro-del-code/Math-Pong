@@ -2635,6 +2635,7 @@ function showReadyFlash() {
 socket.on('math_question', data => { showMath(data); });
 socket.on('math_result',   data => { resolvemath(data); });
 socket.on('game_over',     data => { hide('hud'); hide('opponent-label'); hide('mobile-controls'); showWin(data); });
+socket.on('leaderboard_update', data => { buildPodiumWin(data.leaderboard || []); });
 socket.on('opponent_left', ()   => { hide('hud'); hide('opponent-label'); hide('mobile-controls'); hideMathOverlay(); deactivateSwipeZone(); show('screen-disconnected'); });
 
 // ── MATH OVERLAY ──────────────────────────────────────────────────────────────
