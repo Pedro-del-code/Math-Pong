@@ -2797,14 +2797,69 @@ function buildPodiumWin(lb) {
 }
 
 // ── MAPS ─────────────────────────────────────────────────────────────────────
-const MAPS = [
-  { id:'arena',  label:'ARENA NEON',  emoji:'🏟' },
-  { id:'space',  label:'ESPAÇO',      emoji:'🌌' },
-  { id:'retro',  label:'RETRO',       emoji:'🕹' },
+// Fallbacks usados se /maps não retornar nada
+const MAPS_FALLBACK = [
+  { id:'arena',  label:'ARENA NEON', emoji:'🏟', url: null },
+  { id:'space',  label:'ESPAÇO',     emoji:'🌌', url: null },
+  { id:'retro',  label:'RETRO',      emoji:'🕹', url: null },
 ];
+let MAPS = [...MAPS_FALLBACK];
+
+// Carrega imagens do servidor ao iniciar
+(async function loadServerMaps() {
+  try {
+    const res = await fetch('/maps');
+    const data = await res.json();
+    if (data && data.length > 0) {
+      MAPS = data.map(m => ({
+        id:    m.id,
+        label: m.label,
+        emoji: '🗺',
+        url:   m.url,
+      }));
+      console.log(`[MAPS] ${MAPS.length} mapas carregados do servidor.`);
+    }
+  } catch(e) {
+    console.warn('[MAPS] Falha ao carregar mapas do servidor, usando fallback.');
+  }
+})();
+
+// Elemento de fundo que fica atrás do canvas 3D
+let _mapBgEl = null;
+function _getMapBg() {
+  if (!_mapBgEl) {
+    _mapBgEl = document.createElement('div');
+    _mapBgEl.id = 'map-bg';
+    _mapBgEl.style.cssText = [
+      'position:fixed', 'inset:0', 'z-index:0', 'pointer-events:none',
+      'background-size:cover', 'background-position:center',
+      'background-repeat:no-repeat',
+      'transition:opacity 1.2s ease, background-image 0s',
+      'opacity:0',
+    ].join(';');
+    // Insere ANTES do canvas 3D para ficar atrás de tudo
+    const canvas = document.getElementById('three-canvas');
+    document.body.insertBefore(_mapBgEl, canvas);
+  }
+  return _mapBgEl;
+}
 
 function applyMap(mapId) {
-  // Change scene fog/floor color based on map
+  const map = MAPS.find(m => m.id === mapId);
+  const bg  = _getMapBg();
+
+  if (map && map.url) {
+    // Imagem real do servidor — aplica como fundo com fade
+    bg.style.backgroundImage = `url('${map.url}')`;
+    bg.style.opacity = '0.28';  // semi-transparente para não ofuscar a arena 3D
+  } else {
+    // Sem imagem — remove o fundo e ajusta cores da cena Three.js
+    bg.style.opacity = '0';
+    bg.style.backgroundImage = 'none';
+  }
+
+  // Ajuste de fog/floor da cena 3D por tipo de mapa (mantém compatibilidade)
+  if (!threeScene) return;
   switch(mapId) {
     case 'space':
       threeScene.fog.color.setHex(0x000010);
@@ -2818,6 +2873,12 @@ function applyMap(mapId) {
       threeScene.fog.color.setHex(0x000408);
       threeFloor.material.color.setHex(0x010812);
   }
+}
+
+function clearMapBg() {
+  const bg = _getMapBg();
+  bg.style.opacity = '0';
+  setTimeout(() => { bg.style.backgroundImage = 'none'; }, 1200);
 }
 
 function spinMapRoulette() {
@@ -2839,9 +2900,14 @@ function spinMapRoulette() {
     items.forEach(m => {
       const div = document.createElement('div');
       div.className = 'map-roulette-item';
-      div.innerHTML = `<div style="height:88px;display:flex;align-items:center;justify-content:center;font-size:40px;background:linear-gradient(135deg,rgba(0,238,255,0.05),rgba(0,0,0,0.8));">${m.emoji}</div><div class="map-label">${m.emoji} ${m.label}</div>`;
+      // Usa thumbnail da imagem se disponível, senão emoji
+      const thumb = m.url
+        ? `<div style="height:88px;background:url('${m.url}') center/cover no-repeat;border-radius:4px 4px 0 0;"></div>`
+        : `<div style="height:88px;display:flex;align-items:center;justify-content:center;font-size:40px;background:linear-gradient(135deg,rgba(0,238,255,0.05),rgba(0,0,0,0.8));">${m.emoji}</div>`;
+      div.innerHTML = `${thumb}<div class="map-label">${m.label}</div>`;
       track.appendChild(div);
     });
+
     title.textContent = '🗺 ESCOLHENDO MAPA...';
     status.textContent = 'SORTEANDO...'; status.classList.remove('chosen');
     chosen.classList.remove('show'); chosen.textContent = '';
@@ -2863,8 +2929,9 @@ function spinMapRoulette() {
         clearInterval(hlInterval);
         track.querySelectorAll('.map-roulette-item').forEach((el,i) => el.classList.toggle('active', i === landingIdx));
         title.textContent = '✅ MAPA ESCOLHIDO!';
-        status.textContent = `${winner.emoji} ${winner.label}`; status.classList.add('chosen');
-        chosen.textContent = `${winner.emoji} ${winner.label}`; chosen.classList.add('show');
+        const winLabel = winner.url ? `🗺 ${winner.label}` : `${winner.emoji} ${winner.label}`;
+        status.textContent = winLabel; status.classList.add('chosen');
+        chosen.textContent = winLabel; chosen.classList.add('show');
         SFX.rouletteResult?.();
         applyMap(winner.id);
         setTimeout(() => {
@@ -3335,6 +3402,7 @@ function goMenu() {
   show('screen-menu');
   // Reset arena visuals
   applyMap('arena');
+  clearMapBg();
   // Reset Three.js objects
   buildPaddlesAndBall(); // rebuilds with correct rotation/scale (also calls updateHUDSkins inside)
 }
