@@ -49,11 +49,7 @@ def db_get_leaderboard():
     if not supabase:
         return []
     try:
-        res = (supabase.table('players')
-               .select('name,turma,wins')
-               .order('wins', desc=True)
-               .limit(10)
-               .execute())
+        res = supabase.rpc('get_leaderboard').execute()
         return res.data or []
     except Exception as e:
         print(f'[DB] leaderboard error: {e}')
