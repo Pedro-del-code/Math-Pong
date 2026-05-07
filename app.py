@@ -752,7 +752,7 @@ def on_join_queue(data):
                 'opponent': w['info']['name'], 'turma': w['info'].get('turma', ''),
             }, to=sid)
 
-            room.start()
+            # NÃO inicia aqui — aguarda sinal 'game_ready' dos dois clientes
             print(f"[GAME] {room_id} — {w['info']['name']} vs {name} (nível {avg_level})")
         else:
             waiting = {'sid': sid, 'info': player_info}
@@ -791,6 +791,30 @@ def on_cancel_queue():
         if waiting and waiting['sid'] == sid:
             waiting = None
             print(f"[QUEUE] {sid} cancelou a fila.")
+
+
+@socketio.on('game_ready')
+def on_game_ready(data):
+    """Cliente emite quando roleta + countdown terminaram — só então inicia a física."""
+    room_id = data.get('room_id')
+    if not room_id or room_id not in rooms:
+        return
+    room = rooms[room_id]
+    with room._lock:
+        if not hasattr(room, '_ready_count'):
+            room._ready_count = 0
+        room._ready_count += 1
+        if room._ready_count >= 2 and not room.running:
+            room.start()
+            print(f"[GAME] {room_id} física iniciada — ambos prontos")
+        elif room._ready_count == 1:
+            # Fallback: se após 12s o segundo cliente não confirmar, inicia mesmo assim
+            def fallback_start():
+                time.sleep(12)
+                if room_id in rooms and not rooms[room_id].running:
+                    rooms[room_id].start()
+                    print(f"[GAME] {room_id} física iniciada — fallback timeout")
+            threading.Thread(target=fallback_start, daemon=True).start()
 
 
 @socketio.on('disconnect')
