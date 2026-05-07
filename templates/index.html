@@ -1963,9 +1963,12 @@ let BASE_CAM = { x: 0, y: 9, z: 0 };
 
 // ── MAIN RENDER LOOP ─────────────────────────────────────────────────────────
 let globalTime = 0;
-function threeLoop() {
+let _lastRAFTime = 0;
+function threeLoop(now) {
   threeAnimFrame = requestAnimationFrame(threeLoop);
-  globalTime += 0.016;
+  const dt = _lastRAFTime ? Math.min((now - _lastRAFTime) / 1000, 0.05) : 0.016;
+  _lastRAFTime = now;
+  globalTime += dt;
 
   // Animate center line pulse
   if (threeCenterLine) {
@@ -1991,6 +1994,17 @@ function threeLoop() {
   threeCamera.lookAt(BASE_CAM.x, 0, BASE_CAM.z);
 
   if (gameRunning3D) {
+    // ── Interpolação multiplayer (dentro do RAF, delta-time real) ──
+    if (!aiMode && !gamePaused) {
+      // alpha = quão rápido converge. 18/s significa ~95% em ~167ms (bom para 60Hz server)
+      const ballAlpha  = 1 - Math.pow(1 - 0.85, dt * 60); // ~85% por frame a 60fps
+      const paddleAlpha = 1 - Math.pow(1 - 0.80, dt * 60);
+      window._ballX += (_ballTargetX - window._ballX) * ballAlpha;
+      window._ballY += (_ballTargetY - window._ballY) * ballAlpha;
+      oppPaddleY    += (_oppTargetY  - oppPaddleY)    * paddleAlpha;
+      window._oppPaddleY = oppPaddleY;
+    }
+
     // Sync paddle positions
     const p0y = window._myIdx === 0 ? window._myPaddleY : window._oppPaddleY;
     const p1y = window._myIdx === 0 ? window._oppPaddleY : window._myPaddleY;
@@ -2465,17 +2479,27 @@ let _oppTargetY = 0;
 socket.on('game_state', data => {
   if (aiMode) return;   // modo IA cuida do próprio estado, ignora pacotes de rede
   const b = data.ball;
-  _ballTargetX = b.x; _ballTargetY = b.y;
-  ballState.x = b.x; ballState.y = b.y;
 
-  // Não sobrescreve myPaddleY com valor do servidor — evita jitter no próprio jogador
-  // Apenas atualiza o paddle do oponente como alvo de interpolação
-  if (myIdx === 0) {
-    _oppTargetY = data.paddle1;
-  } else {
-    _oppTargetY = data.paddle0;
+  // Atualiza o alvo de interpolação da bola
+  _ballTargetX = b.x;
+  _ballTargetY = b.y;
+
+  // Se a bola estava parada (pausa) e agora tem velocidade, snap imediato para evitar teletransporte
+  if (!gamePaused && (Math.abs(b.vx) > 0 || Math.abs(b.vy) > 0)) {
+    const distX = Math.abs(_ballTargetX - window._ballX);
+    const distY = Math.abs(_ballTargetY - window._ballY);
+    // Se a bola sumiu da tela (distância grande = glitch), snap direto
+    if (distX > 0.3 || distY > 0.3) {
+      window._ballX = _ballTargetX;
+      window._ballY = _ballTargetY;
+    }
   }
-  window._myPaddleY = myPaddleY; // mantém valor local autoritativo
+
+  ballState.x = b.x; ballState.y = b.y;
+  ballState.vx = b.vx; ballState.vy = b.vy;
+
+  // Apenas atualiza o paddle do oponente como alvo de interpolação
+  _oppTargetY = myIdx === 0 ? data.paddle1 : data.paddle0;
 
   if (data.time_left !== undefined) {
     const t = data.time_left;
@@ -2485,16 +2509,7 @@ socket.on('game_state', data => {
   }
 });
 
-// Loop de interpolação multiplayer — roda apenas quando NÃO está no modo IA
-setInterval(() => {
-  if (!gameRunning3D || gamePaused || aiMode) return;
-  // Suaviza bola (interpola entre updates do servidor ~20Hz)
-  window._ballX += (_ballTargetX - window._ballX) * 0.4;
-  window._ballY += (_ballTargetY - window._ballY) * 0.4;
-  // Suaviza paddle adversário
-  oppPaddleY += (_oppTargetY - oppPaddleY) * 0.45;
-  window._oppPaddleY = oppPaddleY;
-}, 16);
+// Interpolação feita diretamente no threeLoop com delta-time real (ver abaixo)
 
 socket.on('score_update', data => {
   scores = data.scores;
@@ -2695,6 +2710,11 @@ function hideMathOverlay() {
   clearInterval(mathTimerInterval);
   document.getElementById('math-overlay').classList.remove('show');
   gamePaused = false;
+  // Snap bola ao target atual para evitar teletransporte após pausa
+  if (!aiMode) {
+    window._ballX = _ballTargetX;
+    window._ballY = _ballTargetY;
+  }
 }
 
 // ── CONFETTI ──────────────────────────────────────────────────────────────────
