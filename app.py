@@ -163,6 +163,9 @@ class GameRoom:
 
     def _loop(self):
         TICK = 1 / 60
+        _broadcast_acc = 0.0
+        BROADCAST_INTERVAL = 1 / 30  # envia state ao cliente em 30Hz; física roda em 60Hz
+
         while self.running:
             t0 = time.perf_counter()
 
@@ -176,9 +179,12 @@ class GameRoom:
             if not self.math_active:
                 self._update()
 
-            state = self._state()
-            state['time_left'] = int(self.time_left)
-            socketio.emit('game_state', state, room=self.room_id)
+            _broadcast_acc += TICK
+            if _broadcast_acc >= BROADCAST_INTERVAL:
+                _broadcast_acc -= BROADCAST_INTERVAL
+                state = self._state()
+                state['time_left'] = int(self.time_left)
+                socketio.emit('game_state', state, room=self.room_id)
 
             elapsed = time.perf_counter() - t0
             time.sleep(max(0.0, TICK - elapsed))
