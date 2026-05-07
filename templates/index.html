@@ -2518,19 +2518,24 @@ socket.on('score_update', data => {
     triggerGoalFlash(data.scorer);
     SFX.goal(data.scorer === myIdx);
     camShake = 0.8; // 3D camera shake!
-    // 3D particles at goal position (corrected to -7/7)
+    // 3D particles at goal position
     spawnParticles3D(
-      data.scorer === 0 ? -7 : 7,
+      data.scorer === 0 ? -9 : 9,
       gameToThreeZ(0),
       data.scorer === 0 ? 0x00eeff : 0xff4466,
       IS_MOBILE ? 15 : 30
     );
-    // Reset client ball position to center after goal
-    window._ballX = 0; window._ballY = 0;
-    ballState.x = 0; ballState.y = 0;
     const scorerEl = document.querySelector(`#s${data.scorer} .score-val`);
     if (scorerEl) { scorerEl.style.transform = 'scale(1.5)'; scorerEl.style.transition = 'transform 0.15s'; setTimeout(()=>{scorerEl.style.transform='scale(1)';},350); }
     showReadyFlash();
+
+    // Condição de 2 pontos — encerra a partida
+    if (scores[0] >= 2 || scores[1] >= 2) {
+      const winIdx = scores[0] >= 2 ? 0 : 1;
+      setTimeout(() => {
+        showGameOver(winIdx === myIdx ? myName : 'ADVERSÁRIO', scores);
+      }, 900);
+    }
   }
 
   const msb0 = document.getElementById('msb-score0'); const msb1 = document.getElementById('msb-score1');
@@ -2851,7 +2856,7 @@ function movePaddle(dir) {
   const d = reverseControls ? -dir : dir;
   myPaddleY = Math.max(-1+PADDLE_H_CLIENT, Math.min(1-PADDLE_H_CLIENT, myPaddleY + d*MOVE_SPEED));
   window._myPaddleY = myPaddleY;
-  if (roomId && roomId !== 'ai-room') socket.emit('move_paddle', { room_id: roomId, y: myPaddleY });
+  if (roomId) socket.emit('move_paddle', { room_id: roomId, y: myPaddleY });
 }
 
 document.addEventListener('keydown', e => { if(keys[e.key]) return; keys[e.key]=true; if(['ArrowUp','ArrowDown',' '].includes(e.key)) e.preventDefault(); });
@@ -2875,21 +2880,14 @@ function activateSwipeZone() {
   const zone = document.getElementById('swipe-zone');
   if (!zone || window.innerWidth > 1024) return;
   zone.style.display = 'block';
-  let lastY = 0;
-  // Sensibilidade adaptada ao DPI e orientação — igual ao comportamento do modo IA
-  function getSens() {
-    const dpr = window.devicePixelRatio || 1;
-    const isLandscape = window.innerWidth > window.innerHeight;
-    // Em landscape a tela física é menor na vertical → mais sensível
-    return isLandscape ? Math.max(6, 10 / dpr) : Math.max(12, 22 / dpr);
-  }
-  zone.ontouchstart = e => { lastY = e.touches[0].clientY; };
+  let startY = 0, lastY = 0;
+  zone.ontouchstart = e => { startY = e.touches[0].clientY; lastY = startY; };
   zone.ontouchmove  = e => {
     e.preventDefault();
     const dy  = e.touches[0].clientY - lastY;
     lastY = e.touches[0].clientY;
     const dir = dy > 0 ? 1 : -1;
-    const sens = getSens();
+    const sens = window.innerWidth > window.innerHeight ? 9 : 20;
     movePaddle(dir * Math.min(1, Math.abs(dy) / sens));
   };
 }
@@ -2925,9 +2923,6 @@ socket.on('match_found', data => {
   myIdx  = data.player_idx;
   window._myIdx = myIdx;
   myPaddleY  = 0; oppPaddleY = 0;
-  window._myPaddleY = 0; window._oppPaddleY = 0;
-  ballState  = { x:0, y:0, vx:0, vy:0 };
-  window._ballX = 0; window._ballY = 0;
   scores     = [0, 0];
   paddleScaleP0 = 1.0; paddleScaleP1 = 1.0;
   reverseControls = false;
@@ -2948,9 +2943,11 @@ socket.on('match_found', data => {
   document.getElementById('msb-score0').textContent = '0';
   document.getElementById('msb-score1').textContent = '0';
 
-  // Rebuild paddles in correct orientation — always reset to standard positions
-  threePaddle0.position.x = -7;
-  threePaddle1.position.x = 7;
+  // Rebuild paddles in correct orientation
+  if (myIdx === 1) {
+    threePaddle0.position.x = -9;
+    threePaddle1.position.x = 9;
+  }
 
   hide('screen-waiting'); hide('screen-menu'); hide('screen-win');
   show('hud'); show('opponent-label');
@@ -3099,6 +3096,14 @@ function aiPoint(scorerIdx) {
   if(el) { el.style.transform='scale(1.5)'; setTimeout(()=>el.style.transform='scale(1)',350); }
   paddleScaleP0=1.0; paddleScaleP1=1.0; reverseControls=false;
   ballState = {x:0,y:0,vx:0,vy:0}; window._ballX=0; window._ballY=0;
+
+  if (scores[scorerIdx] >= 2) {
+    clearInterval(aiInterval); aiInterval = null;
+    aiMode = false;
+    setTimeout(() => showGameOver(scorerIdx === 0 ? myName : 'I.A.', scores), 800);
+    return;
+  }
+
   showReadyFlash();
   setTimeout(() => {
     if (!aiMode) return;
@@ -3237,20 +3242,9 @@ function goMenu() {
   clearInterval(aiInterval);
   const ao = document.getElementById('ai-math-overlay');
   if (ao) ao.style.display = 'none';
-  // Se estava em sala multiplayer, notifica saída
-  if (roomId && roomId !== 'ai-room') {
-    socket.emit('leave_room', { room_id: roomId });
-  }
   roomId = null; gamePaused = false; reverseControls = false;
   paddleScaleP0=1.0; paddleScaleP1=1.0;
   gameRunning3D = false;
-  // Resetar bola e paddles para centro
-  ballState = { x:0, y:0, vx:0, vy:0 };
-  window._ballX = 0; window._ballY = 0;
-  myPaddleY = 0; oppPaddleY = 0;
-  window._myPaddleY = 0; window._oppPaddleY = 0;
-  scores = [0, 0];
-  clientRallyCount = 0;
   hide('screen-win'); hide('hud'); hide('opponent-label'); hide('mobile-controls');
   deactivateSwipeZone();
   hideMathOverlay();
