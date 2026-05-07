@@ -289,10 +289,13 @@ class GameRoom:
             'leaderboard':  [],
         }, room=self.room_id)
 
-        # Salva no DB em background sem bloquear nada
-        def save_result():
+        # Salva win e depois manda leaderboard atualizado em background
+        room_id = self.room_id
+        def save_and_push_leaderboard():
             db_add_win(winner_info.get('name'), winner_info.get('turma', ''))
-        threading.Thread(target=save_result, daemon=True).start()
+            lb = db_get_leaderboard()
+            socketio.emit('leaderboard_update', {'leaderboard': lb}, room=room_id)
+        threading.Thread(target=save_and_push_leaderboard, daemon=True).start()
 
     # ── MATEMÁTICA ───────────────────────────────────────────────────────────
 
