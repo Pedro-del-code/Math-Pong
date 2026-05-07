@@ -690,6 +690,25 @@ def leaderboard():
 def health():
     return jsonify({'status': 'ok', 'rooms': len(rooms)})
 
+@app.route('/maps')
+def list_maps():
+    """Escaneia static/maps/ e retorna lista de imagens disponíveis."""
+    ALLOWED_EXT = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
+    maps_dir = os.path.join(app.static_folder, 'maps')
+    if not os.path.isdir(maps_dir):
+        return jsonify([])
+    maps = []
+    for fname in sorted(os.listdir(maps_dir)):
+        ext = os.path.splitext(fname)[1].lower()
+        if ext in ALLOWED_EXT:
+            name = os.path.splitext(fname)[0].replace('_', ' ').replace('-', ' ').upper()
+            maps.append({
+                'id':    fname,
+                'label': name,
+                'url':   f'/static/maps/{fname}',
+            })
+    return jsonify(maps)
+
 
 # ── SOCKET EVENTS ─────────────────────────────────────────────────────────────
 
