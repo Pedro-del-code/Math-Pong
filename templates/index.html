@@ -1857,8 +1857,8 @@ function buildPaddlesAndBall() {
 function updateHUDSkins() {
   const c0 = document.getElementById('hud-skin-p0');
   const c1 = document.getElementById('hud-skin-p1');
-  if (c0) drawSkinPreview2D(c0, 'paddle', selectedPaddleSkin, false);
-  if (c1) drawSkinPreview2D(c1, 'paddle', selectedPaddleSkin, true);
+  if (c0) drawSkinPreview2D(c0, 'paddle', selectedPaddleSkin, true);   // p0 = ciano
+  if (c1) drawSkinPreview2D(c1, 'paddle', selectedPaddleSkin, false);  // p1 = vermelho
 }
 
 // ── COORDINATE MAPPING ───────────────────────────────────────────────────────
@@ -2186,7 +2186,7 @@ function drawSkinPreview2D(canvas, type, skinKey, isP1) {
   ctx.clearRect(0, 0, W, H);
 
   if (type === 'paddle') {
-    const color = isP1 ? '#00eeff' : '#ff4466';
+    const color = isP1 ? '#ff4466' : '#00eeff';  // p0=ciano, p1=vermelho
     const skin = PADDLE_SKINS_3D[skinKey];
     // Show distinct icons per skin
     ctx.shadowColor = color;
@@ -2448,7 +2448,6 @@ function applyEffect(effectId, isMe) {
         showEffectToast('🏓 Raquete gigante por 8s!');
         setTimeout(() => { if (myIdx === 0) paddleScaleP0 = 1.0; else paddleScaleP1 = 1.0; }, 8000);
       } else {
-        const oppScale = myIdx === 0 ? 1 : 0;
         if (myIdx === 0) paddleScaleP1 = 1.75; else paddleScaleP0 = 1.75;
         setTimeout(() => { if (myIdx === 0) paddleScaleP1 = 1.0; else paddleScaleP0 = 1.0; }, 8000);
       }
@@ -2576,17 +2575,7 @@ socket.on('score_update', data => {
     const scorerEl = document.querySelector(`#s${data.scorer} .score-val`);
     if (scorerEl) { scorerEl.style.transform = 'scale(1.5)'; scorerEl.style.transition = 'transform 0.15s'; setTimeout(()=>{scorerEl.style.transform='scale(1)';},350); }
     showReadyFlash();
-
-    // Condição de 2 pontos — encerra a partida
-    if (scores[0] >= 2 || scores[1] >= 2) {
-      const winIdx = scores[0] >= 2 ? 0 : 1;
-      const winnerName = winIdx === myIdx ? myName : (document.getElementById(winIdx===0?'label0':'label1')?.textContent || 'ADVERSÁRIO');
-      setTimeout(() => {
-        hide('hud'); hide('opponent-label'); hide('mobile-controls');
-        deactivateSwipeZone();
-        showWin({ winner_idx: winIdx, winner_name: winnerName, winner_turma: '', scores, leaderboard: [] });
-      }, 900);
-    }
+    // Não encerra aqui — aguarda o evento game_over do servidor para evitar dupla chamada de showWin
   }
 
   const msb0 = document.getElementById('msb-score0'); const msb1 = document.getElementById('msb-score1');
@@ -2646,7 +2635,7 @@ function showReadyFlash() {
 socket.on('math_question', data => { showMath(data); });
 socket.on('math_result',   data => { resolvemath(data); });
 socket.on('game_over',     data => { hide('hud'); hide('opponent-label'); hide('mobile-controls'); showWin(data); });
-socket.on('opponent_left', ()   => { hide('hud'); hide('opponent-label'); hide('mobile-controls'); hideMathOverlay(); show('screen-disconnected'); });
+socket.on('opponent_left', ()   => { hide('hud'); hide('opponent-label'); hide('mobile-controls'); hideMathOverlay(); deactivateSwipeZone(); show('screen-disconnected'); });
 
 // ── MATH OVERLAY ──────────────────────────────────────────────────────────────
 let mathTimerInterval = null;
@@ -2983,7 +2972,7 @@ function joinQueue() {
 }
 
 function cancelQueue() {
-  socket.disconnect(); socket.connect();
+  socket.emit('cancel_queue');
   hide('screen-waiting'); show('screen-menu');
 }
 
@@ -3017,11 +3006,8 @@ socket.on('match_found', data => {
   document.getElementById('msb-score0').textContent = '0';
   document.getElementById('msb-score1').textContent = '0';
 
-  // Rebuild paddles in correct orientation
-  if (myIdx === 1) {
-    threePaddle0.position.x = -9;
-    threePaddle1.position.x = 9;
-  }
+  // Rebuild paddles with correct skins/colors
+  buildPaddlesAndBall();
 
   hide('screen-waiting'); hide('screen-menu'); hide('screen-win');
   show('hud'); show('opponent-label');
