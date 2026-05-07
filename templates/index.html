@@ -2963,6 +2963,8 @@ function startCountdown() {
     overlay.classList.remove('show');
     gamePaused = false;
     _aiLastRAF = null; // reset timing so first frame after unpause doesn't accumulate huge dt
+    // Avisa o servidor que este cliente terminou roleta+countdown — física só começa quando os dois avisarem
+    if (roomId && !aiMode) socket.emit('game_ready', { room_id: roomId });
   }, 3500);
 }
 
