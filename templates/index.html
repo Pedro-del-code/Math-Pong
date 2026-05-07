@@ -1157,33 +1157,40 @@ function initThree() {
   threeLoop();
 }
 
-// Arena is 24 wide (X) × 9 deep (Z), paddles at x=±9
-// Three.js camera FOV is VERTICAL. In portrait (narrow screen), horizontal FOV = vertical_fov * aspect
-// To see all 24 units wide: horizontal_fov_half must cover 12 units at camera height
-// horizontal_fov = 2*atan(tan(vfov/2) * aspect)
-// We need: tan(vfov/2) * aspect * camY >= 12
-// → tan(vfov/2) >= 12 / (aspect * camY)
+// Compute the play area rectangle (pixels), accounting for HUD + controls
+function _getPlayArea() {
+  const sw = window.innerWidth;
+  const sh = window.innerHeight;
+  const isPortrait = sh > sw;
+  const hudH  = isPortrait ? 92  : 52;  // HUD bar height in px
+  const ctrlH = (IS_MOBILE && isPortrait) ? 115 : (IS_MOBILE ? 75 : 0);
+  const playH = sh - hudH - ctrlH;
+  // viewport y in WebGL is from bottom of canvas
+  const vpY = ctrlH; // bottom of play area from canvas bottom
+  return { x: 0, y: vpY, w: sw, h: Math.max(playH, 100) };
+}
+
 function _setCameraForViewport() {
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  const aspect = vw / vh;
-  const isPortrait = aspect < 1;
+  const pa = _getPlayArea();
+  const aspect = pa.w / pa.h;
+  const isPortrait = window.innerHeight > window.innerWidth;
+
+  // Use scissor so Three.js only draws in the play area
+  threeRenderer.setScissorTest(true);
+  threeRenderer.setScissor(pa.x, pa.y, pa.w, pa.h);
+  threeRenderer.setViewport(pa.x, pa.y, pa.w, pa.h);
 
   let camY;
   if (isPortrait) {
-    camY = 12;
-    // Need to cover ±7.5 horizontally (half-width 7 + paddle width ~0.5)
-    // horizontal coverage = tan(vfov/2) * aspect * camY >= 7.5
-    // tan(vfov/2) >= 7.5 / (aspect * camY)
+    camY = 11;
+    // tan(vfov/2)*aspect*camY >= 7.5 (half arena width + padding)
     const tanHalf = 8 / (aspect * camY);
-    const vfov = 2 * Math.atan(tanHalf) * (180 / Math.PI);
-    threeCamera.fov = Math.min(vfov, 160);
+    threeCamera.fov = Math.min(2 * Math.atan(tanHalf) * (180 / Math.PI), 150);
   } else {
-    camY = 10;
-    // Cover ±4.5 deep (Z: arena depth ±3.8)
-    const tanHalf = 5 / camY;
-    const vfov = 2 * Math.atan(tanHalf) * (180 / Math.PI);
-    threeCamera.fov = Math.max(vfov + 8, 50);
+    camY = 9;
+    // Vertical: tan(vfov/2)*camY >= 4 (half depth + padding)
+    const tanHalf = 4.5 / camY;
+    threeCamera.fov = Math.max(2 * Math.atan(tanHalf) * (180 / Math.PI) + 8, 50);
   }
 
   threeCamera.aspect = aspect;
@@ -1288,24 +1295,28 @@ function buildWallStrip(x, y, z, w, color) {
 
 // ── PADDLE SKIN SYSTEM (3D) ──────────────────────────────────────────────────
 const PADDLE_SKINS_3D = {
+  // All skins built in XZ plane (Y=height/thickness) for top-down visibility
+  // Paddle "length" (blocking surface) goes along Z axis
+  // Paddle "thickness" goes along X axis
+  // Paddle "height" goes along Y axis (visible as depth from above)
   neon: {
     label: 'NEON BLADE',
     emoji: '💎',
     build(color) {
       const g = new THREE.Group();
-      // Main blade — thin glowing slab
+      // Main flat slab — wide in Z, thin in X, short Y
       const body = new THREE.Mesh(
-        new THREE.BoxGeometry(0.35, 2.2, 0.18),
-        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.8, roughness: 0.1, metalness: 0.9 })
+        new THREE.BoxGeometry(0.28, 0.22, 2.2),
+        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 1.2, roughness: 0.1, metalness: 0.9 })
       );
       g.add(body);
-      // Edge glow strips
-      [-0.16, 0.16].forEach(xo => {
+      // Edge glow at each end of the paddle
+      [-1.1, 1.1].forEach(zo => {
         const strip = new THREE.Mesh(
-          new THREE.BoxGeometry(0.03, 2.2, 0.04),
-          new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 2.0 })
+          new THREE.BoxGeometry(0.34, 0.28, 0.08),
+          new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 3.0 })
         );
-        strip.position.x = xo;
+        strip.position.z = zo;
         g.add(strip);
       });
       return g;
@@ -1316,22 +1327,21 @@ const PADDLE_SKINS_3D = {
     emoji: '🔷',
     build(color) {
       const g = new THREE.Group();
-      // Crystal prism shape
-      const pts = [
-        new THREE.Vector2(-0.15, -1.1),
-        new THREE.Vector2( 0.15, -1.1),
-        new THREE.Vector2( 0.2,  0),
-        new THREE.Vector2( 0.15,  1.1),
-        new THREE.Vector2(-0.15,  1.1),
-        new THREE.Vector2(-0.2,  0),
-      ];
-      const shape = new THREE.Shape(pts);
-      const extSettings = { depth: 0.28, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.04, bevelSegments: 3 };
-      const geo = new THREE.ExtrudeGeometry(shape, extSettings);
-      const mat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.4, roughness: 0.05, metalness: 0.7, transparent: true, opacity: 0.85 });
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.z = -0.14;
-      g.add(mesh);
+      // Hexagonal flat shape in XZ
+      const body = new THREE.Mesh(
+        new THREE.BoxGeometry(0.32, 0.2, 2.2),
+        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.8, roughness: 0.05, metalness: 0.7, transparent: true, opacity: 0.9 })
+      );
+      g.add(body);
+      // Crystal facet glows at each end
+      [-1.0, 1.0].forEach(z => {
+        const facet = new THREE.Mesh(
+          new THREE.BoxGeometry(0.28, 0.24, 0.15),
+          new THREE.MeshStandardMaterial({ color: 0xaaddff, emissive: 0x88ccff, emissiveIntensity: 2.0, transparent: true, opacity: 0.8 })
+        );
+        facet.position.z = z;
+        g.add(facet);
+      });
       return g;
     }
   },
@@ -1340,34 +1350,18 @@ const PADDLE_SKINS_3D = {
     emoji: '⚔️',
     build(color) {
       const g = new THREE.Group();
-      // Blade
+      // Blade along Z
       const blade = new THREE.Mesh(
-        new THREE.BoxGeometry(0.12, 1.8, 0.06),
-        new THREE.MeshStandardMaterial({ color: 0xddeeff, emissive: 0xaaccff, emissiveIntensity: 0.3, roughness: 0.05, metalness: 0.95 })
+        new THREE.BoxGeometry(0.1, 0.15, 1.9),
+        new THREE.MeshStandardMaterial({ color: 0xddeeff, emissive: 0xaaccff, emissiveIntensity: 0.5, roughness: 0.05, metalness: 0.95 })
       );
-      blade.position.y = 0.2;
       g.add(blade);
-      // Guard (crossguard)
+      // Cross-guard along X
       const guard = new THREE.Mesh(
-        new THREE.BoxGeometry(0.7, 0.12, 0.12),
-        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.7, roughness: 0.2, metalness: 0.8 })
+        new THREE.BoxGeometry(0.7, 0.18, 0.16),
+        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.8, roughness: 0.2, metalness: 0.8 })
       );
-      guard.position.y = -0.65;
       g.add(guard);
-      // Handle
-      const handle = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.06, 0.08, 0.5, 8),
-        new THREE.MeshStandardMaterial({ color: 0x4a2800, roughness: 0.8, metalness: 0.1 })
-      );
-      handle.position.y = -1.0;
-      g.add(handle);
-      // Pommel
-      const pommel = new THREE.Mesh(
-        new THREE.SphereGeometry(0.1, 8, 8),
-        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.5 })
-      );
-      pommel.position.y = -1.28;
-      g.add(pommel);
       return g;
     }
   },
@@ -1376,26 +1370,28 @@ const PADDLE_SKINS_3D = {
     emoji: '🚀',
     build(color) {
       const g = new THREE.Group();
-      // Main body
+      // Body along Z
       const body = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.16, 0.2, 1.8, 10),
-        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.3, roughness: 0.3, metalness: 0.8 })
+        new THREE.CylinderGeometry(0.14, 0.16, 2.0, 10),
+        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.4, roughness: 0.3, metalness: 0.8 })
       );
+      body.rotation.x = Math.PI / 2; // lay cylinder along Z
       g.add(body);
       // Nose cone
       const nose = new THREE.Mesh(
-        new THREE.ConeGeometry(0.16, 0.5, 10),
-        new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xccccff, emissiveIntensity: 0.5, roughness: 0.1, metalness: 0.9 })
+        new THREE.ConeGeometry(0.14, 0.45, 10),
+        new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xccccff, emissiveIntensity: 0.6, roughness: 0.1, metalness: 0.9 })
       );
-      nose.position.y = 1.15;
+      nose.rotation.x = -Math.PI / 2;
+      nose.position.z = 1.22;
       g.add(nose);
-      // Fins
+      // Fins along X
       [-0.22, 0.22].forEach(xo => {
         const fin = new THREE.Mesh(
-          new THREE.BoxGeometry(0.24, 0.45, 0.05),
-          new THREE.MeshStandardMaterial({ color: 0xff4400, emissive: 0xff4400, emissiveIntensity: 0.6, roughness: 0.3 })
+          new THREE.BoxGeometry(0.22, 0.1, 0.45),
+          new THREE.MeshStandardMaterial({ color: 0xff4400, emissive: 0xff4400, emissiveIntensity: 0.7 })
         );
-        fin.position.set(xo, -0.85, 0);
+        fin.position.set(xo, 0, -0.85);
         g.add(fin);
       });
       return g;
@@ -1406,40 +1402,25 @@ const PADDLE_SKINS_3D = {
     emoji: '✏️',
     build(color) {
       const g = new THREE.Group();
-      // Barrel
       const barrel = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.15, 0.15, 1.7, 6),
-        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.4, roughness: 0.4, metalness: 0.3 })
+        new THREE.CylinderGeometry(0.14, 0.14, 1.8, 6),
+        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.5, roughness: 0.4, metalness: 0.3 })
       );
+      barrel.rotation.x = Math.PI / 2;
       g.add(barrel);
-      // Eraser (top)
       const eraser = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.15, 0.15, 0.2, 6),
-        new THREE.MeshStandardMaterial({ color: 0xff88aa, emissive: 0xff6688, emissiveIntensity: 0.3, roughness: 0.7 })
+        new THREE.CylinderGeometry(0.14, 0.14, 0.22, 6),
+        new THREE.MeshStandardMaterial({ color: 0xff88aa, emissive: 0xff6688, emissiveIntensity: 0.5, roughness: 0.7 })
       );
-      eraser.position.y = 0.95;
+      eraser.rotation.x = Math.PI / 2;
+      eraser.position.z = -1.01;
       g.add(eraser);
-      // Metal ferrule
-      const ferrule = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.155, 0.155, 0.1, 6),
-        new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.1, metalness: 0.9 })
-      );
-      ferrule.position.y = 0.8;
-      g.add(ferrule);
-      // Tip wood
-      const wood = new THREE.Mesh(
-        new THREE.ConeGeometry(0.15, 0.35, 6),
-        new THREE.MeshStandardMaterial({ color: 0xd4a460, roughness: 0.8 })
-      );
-      wood.position.y = -1.0;
-      wood.rotation.y = Math.PI / 6;
-      g.add(wood);
-      // Graphite tip
       const tip = new THREE.Mesh(
-        new THREE.ConeGeometry(0.025, 0.15, 6),
+        new THREE.ConeGeometry(0.025, 0.2, 6),
         new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.5 })
       );
-      tip.position.y = -1.25;
+      tip.rotation.x = Math.PI / 2;
+      tip.position.z = 1.1;
       g.add(tip);
       return g;
     }
@@ -1449,29 +1430,18 @@ const PADDLE_SKINS_3D = {
     emoji: '🪄',
     build(color) {
       const g = new THREE.Group();
-      // Shaft
       const shaft = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.06, 0.1, 1.9, 8),
+        new THREE.CylinderGeometry(0.07, 0.1, 1.9, 8),
         new THREE.MeshStandardMaterial({ color: 0x2a1500, roughness: 0.7, metalness: 0.1 })
       );
+      shaft.rotation.x = Math.PI / 2;
       g.add(shaft);
-      // Magic orb at top
       const orb = new THREE.Mesh(
         new THREE.SphereGeometry(0.22, 16, 16),
-        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 1.2, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.9 })
+        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 2.0, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.9 })
       );
-      orb.position.y = 1.1;
+      orb.position.z = 1.1;
       g.add(orb);
-      // Star sparkles around orb
-      for (let i = 0; i < 5; i++) {
-        const a = (i / 5) * Math.PI * 2;
-        const spark = new THREE.Mesh(
-          new THREE.OctahedronGeometry(0.05, 0),
-          new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 2.0 })
-        );
-        spark.position.set(Math.cos(a) * 0.35, 1.1 + Math.sin(a) * 0.2, Math.sin(a) * 0.1);
-        g.add(spark);
-      }
       return g;
     }
   },
@@ -1480,25 +1450,25 @@ const PADDLE_SKINS_3D = {
     emoji: '🔴',
     build(color) {
       const g = new THREE.Group();
-      // Emitter housing
+      // Flat emitter housing along Z
       const house = new THREE.Mesh(
-        new THREE.BoxGeometry(0.3, 2.0, 0.25),
+        new THREE.BoxGeometry(0.28, 0.2, 2.0),
         new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2, metalness: 0.9 })
       );
       g.add(house);
-      // Energy core strip
+      // Energy core strip along Z
       const core = new THREE.Mesh(
-        new THREE.BoxGeometry(0.1, 1.9, 0.08),
-        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 2.5 })
+        new THREE.BoxGeometry(0.1, 0.25, 1.9),
+        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 3.0 })
       );
       g.add(core);
-      // Tech details
+      // Tech details along Z
       for (let i = -0.7; i <= 0.7; i += 0.35) {
         const detail = new THREE.Mesh(
-          new THREE.BoxGeometry(0.28, 0.05, 0.28),
+          new THREE.BoxGeometry(0.28, 0.22, 0.06),
           new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.3, metalness: 0.8 })
         );
-        detail.position.y = i;
+        detail.position.z = i;
         g.add(detail);
       }
       return g;
@@ -1509,19 +1479,21 @@ const PADDLE_SKINS_3D = {
     emoji: '⚡',
     build(color) {
       const g = new THREE.Group();
-      // Lightning bolt shape via custom geometry
+      // Lightning bolt lying flat in XZ plane
       const shape = new THREE.Shape();
-      shape.moveTo( 0.1,  1.1);
-      shape.lineTo(-0.15,  0.05);
-      shape.lineTo( 0.05,  0.05);
-      shape.lineTo(-0.1, -1.1);
-      shape.lineTo( 0.15, -0.05);
-      shape.lineTo(-0.05, -0.05);
+      shape.moveTo( 0.12,  1.1);
+      shape.lineTo(-0.12,  0.1);
+      shape.lineTo( 0.06,  0.1);
+      shape.lineTo(-0.12, -1.1);
+      shape.lineTo( 0.12, -0.1);
+      shape.lineTo(-0.06, -0.1);
       shape.closePath();
-      const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.18, bevelEnabled: false });
-      const mat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 1.5, roughness: 0.1, metalness: 0.4 });
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.22, bevelEnabled: false });
+      const mat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 2.0, roughness: 0.1, metalness: 0.4 });
       const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.z = -0.09;
+      // Rotate so shape lies flat on XZ plane (was in XY)
+      mesh.rotation.x = Math.PI / 2;
+      mesh.position.y = -0.11;
       g.add(mesh);
       return g;
     }
@@ -1683,13 +1655,11 @@ function buildPaddlesAndBall() {
   const skinDef = PADDLE_SKINS_3D[selectedPaddleSkin] || PADDLE_SKINS_3D['neon'];
 
   threePaddle0 = skinDef.build(0x00eeff);
-  threePaddle0.position.set(-7, 0.5, 0);
-  threePaddle0.scale.set(1.2, 1.4, 1.2);
+  threePaddle0.position.set(-7, 0.3, 0);
   threeScene.add(threePaddle0);
 
   threePaddle1 = skinDef.build(0xff4466);
-  threePaddle1.position.set(7, 0.5, 0);
-  threePaddle1.scale.set(1.2, 1.4, 1.2);
+  threePaddle1.position.set(7, 0.3, 0);
   threeScene.add(threePaddle1);
 
   const ballDef = BALL_SKINS_3D[selectedBallSkin] || BALL_SKINS_3D['xmark'];
@@ -1836,19 +1806,21 @@ function threeLoop() {
     if (threePaddle0) {
       const tz = gameToThreeZ(p0y);
       threePaddle0.position.z += (tz - threePaddle0.position.z) * 0.25;
-      threePaddle0.scale.set(1.2, paddleScaleP0 * 1.4, 1.2);
+      const ts = paddleScaleP0;
+      threePaddle0.scale.setScalar(ts);
       if (paddleHitGlow[0] > 0) {
-        threePaddle0.traverse(m => { if (m.isMesh && m.material.emissive) m.material.emissiveIntensity = 0.8 + paddleHitGlow[0] * 2; });
-        paddleHitGlow[0] -= 0.1;
+        threePaddle0.traverse(m => { if (m.isMesh && m.material.emissive) m.material.emissiveIntensity = Math.min(m.material.emissiveIntensity + paddleHitGlow[0] * 1.5, 4); });
+        paddleHitGlow[0] -= 0.08;
       }
     }
     if (threePaddle1) {
       const tz = gameToThreeZ(p1y);
       threePaddle1.position.z += (tz - threePaddle1.position.z) * 0.25;
-      threePaddle1.scale.set(1.2, paddleScaleP1 * 1.4, 1.2);
+      const ts = paddleScaleP1;
+      threePaddle1.scale.setScalar(ts);
       if (paddleHitGlow[1] > 0) {
-        threePaddle1.traverse(m => { if (m.isMesh && m.material.emissive) m.material.emissiveIntensity = 0.8 + paddleHitGlow[1] * 2; });
-        paddleHitGlow[1] -= 0.1;
+        threePaddle1.traverse(m => { if (m.isMesh && m.material.emissive) m.material.emissiveIntensity = Math.min(m.material.emissiveIntensity + paddleHitGlow[1] * 1.5, 4); });
+        paddleHitGlow[1] -= 0.08;
       }
     }
     if (threeBall && !gamePaused) {
