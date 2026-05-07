@@ -2463,22 +2463,20 @@ let _ballTargetX = 0, _ballTargetY = 0;
 let _oppTargetY = 0;
 
 socket.on('game_state', data => {
+  if (aiMode) return;   // modo IA cuida do próprio estado, ignora pacotes de rede
   const b = data.ball;
-  // Recebe posição autoritativa do servidor como alvo da interpolação
   _ballTargetX = b.x; _ballTargetY = b.y;
   ballState.x = b.x; ballState.y = b.y;
 
+  // Não sobrescreve myPaddleY com valor do servidor — evita jitter no próprio jogador
+  // Apenas atualiza o paddle do oponente como alvo de interpolação
   if (myIdx === 0) {
-    myPaddleY  = data.paddle0;
     _oppTargetY = data.paddle1;
   } else {
-    myPaddleY  = data.paddle1;
     _oppTargetY = data.paddle0;
   }
-  window._myPaddleY  = myPaddleY;
-  // oppPaddleY é atualizado suavemente no loop de render via lerp abaixo
+  window._myPaddleY = myPaddleY; // mantém valor local autoritativo
 
-  // Update timer
   if (data.time_left !== undefined) {
     const t = data.time_left;
     const mins = Math.floor(t/60), secs = String(t%60).padStart(2,'0');
@@ -2487,12 +2485,12 @@ socket.on('game_state', data => {
   }
 });
 
-// Loop de interpolação: suaviza bola e paddle adversário entre frames de rede (~20Hz)
+// Loop de interpolação multiplayer — roda apenas quando NÃO está no modo IA
 setInterval(() => {
-  if (!gameRunning3D || gamePaused) return;
-  // Interpola posição da bola exibida em direção ao valor do servidor
-  window._ballX += (_ballTargetX - window._ballX) * 0.35;
-  window._ballY += (_ballTargetY - window._ballY) * 0.35;
+  if (!gameRunning3D || gamePaused || aiMode) return;
+  // Suaviza bola (interpola entre updates do servidor ~20Hz)
+  window._ballX += (_ballTargetX - window._ballX) * 0.4;
+  window._ballY += (_ballTargetY - window._ballY) * 0.4;
   // Suaviza paddle adversário
   oppPaddleY += (_oppTargetY - oppPaddleY) * 0.45;
   window._oppPaddleY = oppPaddleY;
@@ -2862,7 +2860,7 @@ function startCountdown() {
       SFX.countdown(step.text === 'GO!' ? 0 : parseInt(step.text));
     }, step.delay);
   });
-  setTimeout(() => { overlay.classList.remove('show'); gamePaused = false; }, 3500);
+  setTimeout(() => { overlay.classList.remove('show'); gamePaused = false; _aiLastRAF = null; }, 3500);
 }
 
 // ── INPUT ─────────────────────────────────────────────────────────────────────
@@ -2994,13 +2992,15 @@ socket.on('match_found', data => {
 });
 
 // ── AI MODE ────────────────────────────────────────────────────────────────────
-let aiMode     = false;
-let aiInterval = null;
+let aiMode       = false;
+let aiInterval   = null;   // agora guarda o ID do requestAnimationFrame
 let aiDifficulty = 0.055;
+let _aiLastRAF   = null;   // referência de tempo do loop rAF (reset ao sair de pausa)
 
 function startAIGame() {
   aiMode   = true;
   window._aiMathLock = false;
+  _aiLastRAF = null;
   myIdx    = 0;
   window._myIdx = 0;
   myName   = document.getElementById('inp-name').value.trim() || 'JOGADOR';
@@ -3032,86 +3032,98 @@ function startAIGame() {
   spinMapRoulette().then(() => {
     startCountdown();
 
-    let timeLeft = 180;
-    let lastTick = Date.now();
-    let aiRally  = 0;
+    let aiTimeLeft   = 180;
+    let aiRally      = 0;
     let aiMathActive = false;
+    let aiAccum      = 0;
+    const AI_STEP    = 1 / 60;
 
-    aiInterval = setInterval(() => {
+    function aiLoop(now) {
       if (!aiMode) return;
+      aiInterval = requestAnimationFrame(aiLoop);
+
+      if (_aiLastRAF === null) { _aiLastRAF = now; return; }
+      let rawDt = (now - _aiLastRAF) / 1000;
+      _aiLastRAF = now;
+      if (rawDt > 0.1) rawDt = 0.1;
+
+      // Se pausado (math overlay, countdown, etc.) nao avanca timer nem fisica
       if (gamePaused) return;
-      const now = Date.now(), dt = (now - lastTick) / 1000;
-      lastTick = now;
 
-      if (!aiMathActive && !gamePaused) {
-        timeLeft -= dt;
-        if (timeLeft <= 0) { endAIGame(); return; }
-        const t = Math.max(0, Math.floor(timeLeft));
-        const mins = Math.floor(t/60), secs = String(t%60).padStart(2,'0');
+      // Timer
+      if (!aiMathActive) {
+        aiTimeLeft -= rawDt;
+        if (aiTimeLeft <= 0) { aiTimeLeft = 0; endAIGame(); return; }
+        const t = Math.floor(aiTimeLeft);
+        const mins = Math.floor(t / 60), secs = String(t % 60).padStart(2, '0');
         const timerEl = document.getElementById('game-timer');
-        timerEl.textContent = `${mins}:${secs}`;
-        timerEl.classList.toggle('urgent', t <= 30);
+        if (timerEl) { timerEl.textContent = `${mins}:${secs}`; timerEl.classList.toggle('urgent', t <= 30); }
       }
 
-      const b = ballState;
-      if (!gamePaused) {
-        b.x += b.vx; b.y += b.vy;
-      }
-      const prevVy = b.vy;
-      if (b.y < -1 + BALL_R_CLIENT) { b.y = -1 + BALL_R_CLIENT; b.vy = Math.abs(b.vy); SFX.wallHit(); }
-      if (b.y >  1 - BALL_R_CLIENT) { b.y =  1 - BALL_R_CLIENT; b.vy = -Math.abs(b.vy); SFX.wallHit(); }
+      // Fisica em passos fixos de 1/60s
+      aiAccum += rawDt;
+      while (aiAccum >= AI_STEP) {
+        aiAccum -= AI_STEP;
+        if (gamePaused) { aiAccum = 0; break; }
+        const b = ballState;
 
-      window._ballX = b.x; window._ballY = b.y;
+        b.x += b.vx;
+        b.y += b.vy;
 
-      if (!gamePaused) {
-      // Player paddle hit
-      if (b.x < -0.86 + BALL_R_CLIENT && b.vx < 0) {
-        if (Math.abs(b.y - myPaddleY) < (PADDLE_H_CLIENT * paddleScaleP0) + BALL_R_CLIENT) {
-          b.x = -0.86 + BALL_R_CLIENT;
-          const relY = (b.y - myPaddleY) / (PADDLE_H_CLIENT * paddleScaleP0);
-          const angle = relY * Math.PI * 0.38;
-          b.vx = Math.abs(Math.cos(angle)) * BALL_SPEED_CLIENT;
-          b.vy = Math.sin(angle) * BALL_SPEED_CLIENT;
-          // Normalize speed to exactly BALL_SPEED_CLIENT
-          const spd = Math.hypot(b.vx, b.vy);
-          b.vx = (b.vx / spd) * BALL_SPEED_CLIENT;
-          b.vy = (b.vy / spd) * BALL_SPEED_CLIENT;
-          paddleHitGlow[0] = 1.0;
-          spawnParticles3D(gameToThreeX(b.x), gameToThreeZ(b.y), 0x00eeff, IS_MOBILE ? 8 : 16);
-          SFX.paddleHit();
-          aiRally++;
-          if (aiRally % 3 === 0 && !aiMathActive && Math.abs(b.x) < 0.9) { aiMathActive = true; triggerAIMath(() => { aiMathActive = false; }); }
+        if (b.y < -1 + BALL_R_CLIENT) { b.y = -1 + BALL_R_CLIENT; b.vy = Math.abs(b.vy); SFX.wallHit(); }
+        if (b.y >  1 - BALL_R_CLIENT) { b.y =  1 - BALL_R_CLIENT; b.vy = -Math.abs(b.vy); SFX.wallHit(); }
+
+        // Player paddle hit
+        if (b.x < -0.86 + BALL_R_CLIENT && b.vx < 0) {
+          if (Math.abs(b.y - myPaddleY) < (PADDLE_H_CLIENT * paddleScaleP0) + BALL_R_CLIENT) {
+            b.x = -0.86 + BALL_R_CLIENT;
+            const relY  = (b.y - myPaddleY) / (PADDLE_H_CLIENT * paddleScaleP0);
+            const angle = relY * Math.PI * 0.38;
+            const spd   = Math.hypot(Math.cos(angle), Math.sin(angle));
+            b.vx = (Math.abs(Math.cos(angle)) / spd) * BALL_SPEED_CLIENT;
+            b.vy = (Math.sin(angle)           / spd) * BALL_SPEED_CLIENT;
+            paddleHitGlow[0] = 1.0;
+            spawnParticles3D(gameToThreeX(b.x), gameToThreeZ(b.y), 0x00eeff, IS_MOBILE ? 8 : 16);
+            SFX.paddleHit();
+            aiRally++;
+            if (aiRally % 3 === 0 && !aiMathActive) {
+              aiMathActive = true;
+              triggerAIMath(() => { aiMathActive = false; });
+            }
+          }
         }
-      }
 
-      // AI paddle hit
-      if (b.x > 0.86 - BALL_R_CLIENT && b.vx > 0) {
-        if (Math.abs(b.y - oppPaddleY) < (PADDLE_H_CLIENT * paddleScaleP1) + BALL_R_CLIENT) {
-          b.x = 0.86 - BALL_R_CLIENT;
-          const relY = (b.y - oppPaddleY) / (PADDLE_H_CLIENT * paddleScaleP1);
-          const angle = relY * Math.PI * 0.38;
-          b.vx = -Math.abs(Math.cos(angle)) * BALL_SPEED_CLIENT;
-          b.vy = Math.sin(angle) * BALL_SPEED_CLIENT;
-          // Normalize speed to exactly BALL_SPEED_CLIENT
-          const spd = Math.hypot(b.vx, b.vy);
-          b.vx = (b.vx / spd) * BALL_SPEED_CLIENT;
-          b.vy = (b.vy / spd) * BALL_SPEED_CLIENT;
-          paddleHitGlow[1] = 1.0;
-          spawnParticles3D(gameToThreeX(b.x), gameToThreeZ(b.y), 0xff4466, IS_MOBILE ? 8 : 16);
-          SFX.paddleHit();
+        // AI paddle hit
+        if (b.x > 0.86 - BALL_R_CLIENT && b.vx > 0) {
+          if (Math.abs(b.y - oppPaddleY) < (PADDLE_H_CLIENT * paddleScaleP1) + BALL_R_CLIENT) {
+            b.x = 0.86 - BALL_R_CLIENT;
+            const relY  = (b.y - oppPaddleY) / (PADDLE_H_CLIENT * paddleScaleP1);
+            const angle = relY * Math.PI * 0.38;
+            const spd   = Math.hypot(Math.cos(angle), Math.sin(angle));
+            b.vx = -(Math.abs(Math.cos(angle)) / spd) * BALL_SPEED_CLIENT;
+            b.vy =  (Math.sin(angle)            / spd) * BALL_SPEED_CLIENT;
+            paddleHitGlow[1] = 1.0;
+            spawnParticles3D(gameToThreeX(b.x), gameToThreeZ(b.y), 0xff4466, IS_MOBILE ? 8 : 16);
+            SFX.paddleHit();
+          }
         }
+
+        // AI movement
+        const aiTarget = b.vx > 0 ? b.y : oppPaddleY * 0.95;
+        oppPaddleY += (aiTarget - oppPaddleY) * aiDifficulty;
+        oppPaddleY  = Math.max(-1 + PADDLE_H_CLIENT, Math.min(1 - PADDLE_H_CLIENT, oppPaddleY));
+        window._oppPaddleY = oppPaddleY;
+
+        // Gol
+        if (b.x < -1.05) { aiPoint(1); aiAccum = 0; return; }
+        if (b.x >  1.05) { aiPoint(0); aiAccum = 0; return; }
       }
 
-      // AI movement
-      const aiTarget = b.vx > 0 ? b.y : oppPaddleY * 0.95;
-      oppPaddleY += (aiTarget - oppPaddleY) * aiDifficulty;
-      oppPaddleY = Math.max(-1+PADDLE_H_CLIENT, Math.min(1-PADDLE_H_CLIENT, oppPaddleY));
-      window._oppPaddleY = oppPaddleY;
-      } // end !gamePaused
+      window._ballX = ballState.x;
+      window._ballY = ballState.y;
+    }
 
-      if (b.x < -1.05) { aiPoint(1); }
-      if (b.x >  1.05) { aiPoint(0); }
-    }, 16);
+    aiInterval = requestAnimationFrame(aiLoop);
   });
 }
 
@@ -3128,7 +3140,7 @@ function aiPoint(scorerIdx) {
   ballState = {x:0,y:0,vx:0,vy:0}; window._ballX=0; window._ballY=0;
 
   if (scores[scorerIdx] >= 2) {
-    clearInterval(aiInterval); aiInterval = null;
+    if (aiInterval) { cancelAnimationFrame(aiInterval); aiInterval = null; }
     aiMode = false;
     setTimeout(() => showGameOver(scorerIdx === 0 ? myName : 'I.A.', scores), 800);
     return;
@@ -3166,6 +3178,7 @@ function triggerAIMath(onDone) {
     aiOverlay.style.display = 'none';
     window._aiMathLock = false;
     gamePaused = false;
+    _aiLastRAF = null;  // reseta referência de tempo para não acumular dt da pausa
     if (aiMode) { ballState.vx = Math.sign(savedVx)*BALL_SPEED_CLIENT; ballState.vy = (Math.random()-0.5)*0.006; }
     if (onDone) onDone();
   }
@@ -3257,7 +3270,7 @@ function genLocalQuestion() {
 function endAIGame() {
   if (!aiMode) return;
   aiMode = false; window._aiMathLock = false;
-  clearInterval(aiInterval);
+  if (aiInterval) { cancelAnimationFrame(aiInterval); aiInterval = null; }
   const ao = document.getElementById('ai-math-overlay');
   if (ao) ao.style.display = 'none';
   hide('hud'); hide('opponent-label'); hide('mobile-controls');
@@ -3269,7 +3282,7 @@ function endAIGame() {
 // ── GO BACK TO MENU ───────────────────────────────────────────────────────────
 function goMenu() {
   aiMode = false; window._aiMathLock = false;
-  clearInterval(aiInterval);
+  if (aiInterval) { cancelAnimationFrame(aiInterval); aiInterval = null; }
   const ao = document.getElementById('ai-math-overlay');
   if (ao) ao.style.display = 'none';
   roomId = null; gamePaused = false; reverseControls = false;
