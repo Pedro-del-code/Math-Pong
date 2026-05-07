@@ -2020,6 +2020,7 @@ function threeLoop() {
     if (threeBall && !gamePaused) {
       const bx = gameToThreeX(window._ballX || 0);
       const bz = gameToThreeZ(window._ballY || 0);
+      // Posição já suavizada pelo loop de interpolação — aplica direto sem lerp extra
       threeBall.position.x = bx;
       threeBall.position.z = bz;
       threeBall.position.y = 0.1 + Math.sin(globalTime * 8) * 0.03;
@@ -2457,20 +2458,25 @@ function applyEffect(effectId, isMe) {
 socket.on('effect_reverse', data => { if (data.player_idx === myIdx) reverseControls = false; else if (data.player_idx === -1) reverseControls = false; });
 
 // ── GAME STATE SYNC ────────────────────────────────────────────────────────────
+// Interpolation targets for smooth rendering despite network jitter
+let _ballTargetX = 0, _ballTargetY = 0;
+let _oppTargetY = 0;
+
 socket.on('game_state', data => {
   const b = data.ball;
+  // Recebe posição autoritativa do servidor como alvo da interpolação
+  _ballTargetX = b.x; _ballTargetY = b.y;
   ballState.x = b.x; ballState.y = b.y;
-  window._ballX = b.x; window._ballY = b.y;
 
   if (myIdx === 0) {
     myPaddleY  = data.paddle0;
-    oppPaddleY = data.paddle1;
+    _oppTargetY = data.paddle1;
   } else {
     myPaddleY  = data.paddle1;
-    oppPaddleY = data.paddle0;
+    _oppTargetY = data.paddle0;
   }
   window._myPaddleY  = myPaddleY;
-  window._oppPaddleY = oppPaddleY;
+  // oppPaddleY é atualizado suavemente no loop de render via lerp abaixo
 
   // Update timer
   if (data.time_left !== undefined) {
@@ -2480,6 +2486,17 @@ socket.on('game_state', data => {
     if (timerEl) { timerEl.textContent = `${mins}:${secs}`; timerEl.classList.toggle('urgent', t <= 30); }
   }
 });
+
+// Loop de interpolação: suaviza bola e paddle adversário entre frames de rede (~20Hz)
+setInterval(() => {
+  if (!gameRunning3D || gamePaused) return;
+  // Interpola posição da bola exibida em direção ao valor do servidor
+  window._ballX += (_ballTargetX - window._ballX) * 0.35;
+  window._ballY += (_ballTargetY - window._ballY) * 0.35;
+  // Suaviza paddle adversário
+  oppPaddleY += (_oppTargetY - oppPaddleY) * 0.45;
+  window._oppPaddleY = oppPaddleY;
+}, 16);
 
 socket.on('score_update', data => {
   scores = data.scores;
@@ -2852,11 +2869,21 @@ function startCountdown() {
 const keys = {};
 const MOVE_SPEED = 0.028;
 
+// Throttle: só envia ao servidor se posição mudou o suficiente OU passou 50ms
+let _lastEmittedY = null;
+let _lastEmitTime = 0;
 function movePaddle(dir) {
   const d = reverseControls ? -dir : dir;
   myPaddleY = Math.max(-1+PADDLE_H_CLIENT, Math.min(1-PADDLE_H_CLIENT, myPaddleY + d*MOVE_SPEED));
   window._myPaddleY = myPaddleY;
-  if (roomId) socket.emit('move_paddle', { room_id: roomId, y: myPaddleY });
+  if (roomId) {
+    const now = Date.now();
+    if (_lastEmittedY === null || Math.abs(myPaddleY - _lastEmittedY) > 0.005 || (now - _lastEmitTime) > 50) {
+      socket.emit('move_paddle', { room_id: roomId, y: myPaddleY });
+      _lastEmittedY = myPaddleY;
+      _lastEmitTime = now;
+    }
+  }
 }
 
 document.addEventListener('keydown', e => { if(keys[e.key]) return; keys[e.key]=true; if(['ArrowUp','ArrowDown',' '].includes(e.key)) e.preventDefault(); });
@@ -2923,6 +2950,9 @@ socket.on('match_found', data => {
   myIdx  = data.player_idx;
   window._myIdx = myIdx;
   myPaddleY  = 0; oppPaddleY = 0;
+  _ballTargetX = 0; _ballTargetY = 0; _oppTargetY = 0;
+  window._ballX = 0; window._ballY = 0;
+  _lastEmittedY = null; _lastEmitTime = 0;
   scores     = [0, 0];
   paddleScaleP0 = 1.0; paddleScaleP1 = 1.0;
   reverseControls = false;
