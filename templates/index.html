@@ -54,71 +54,20 @@
   .ctrl-btn { width: clamp(68px, 18vw, 88px) !important; height: clamp(68px, 18vw, 88px) !important; font-size: clamp(20px, 5vw, 28px) !important; }
   #mobile-controls { padding-bottom: max(clamp(16px, 4vw, 24px), env(safe-area-inset-bottom, 16px)) !important; }
 }
-/* ── LANDSCAPE MOBILE (qualquer largura) ── */
-@media (orientation: landscape) and (max-height: 500px) {
-  :root { --hud-h: 46px; }
-  #scanlines { display: none; }
-  #screen-menu {
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 24px !important;
-    padding: max(8px, env(safe-area-inset-top, 8px)) max(8px, env(safe-area-inset-right, 8px)) max(8px, env(safe-area-inset-bottom, 8px)) max(8px, env(safe-area-inset-left, 8px)) !important;
-    overflow-y: hidden !important;
-  }
-  #menu-header {
-    width: auto !important;
-    flex-shrink: 0 !important;
-    padding: 0 8px !important;
-    align-items: center !important;
-  }
-  #menu-header::after { display: none; }
-  .menu-logo {
-    font-size: clamp(26px, 5vh, 42px) !important;
-    letter-spacing: 1px !important;
-    margin-bottom: 4px !important;
-    line-height: 1 !important;
-  }
-  .menu-badge { font-size: 7px !important; letter-spacing: 2px !important; margin-top: 4px !important; }
-  .menu-card {
-    margin-top: 0 !important;
-    padding: 12px 14px !important;
-    gap: 6px !important;
-    width: min(320px, 50vw) !important;
-    flex-shrink: 0 !important;
-  }
-  .input-group { gap: 5px !important; width: 100% !important; }
-  .input-group input { padding: 9px 14px !important; font-size: 11px !important; }
-  .serie-select { padding: 9px 28px 9px 12px !important; font-size: 10px !important; }
-  .btn-primary { padding: 10px 16px !important; font-size: 10px !important; min-height: 38px !important; }
-  .btn-secondary { padding: 7px 14px !important; font-size: 9px !important; min-height: 34px !important; }
-  .btn-action { padding: 7px 10px !important; font-size: 8px !important; }
-  .menu-divider { margin: 2px 0 !important; }
-  #menu-version { display: none !important; }
-  /* Controls landscape */
-  #mobile-controls {
-    flex-direction: column !important;
-    width: auto !important; height: auto !important;
-    bottom: 50% !important; right: max(8px, env(safe-area-inset-right, 8px)) !important; left: auto !important;
-    transform: translateY(50%) !important;
-    gap: 10px !important;
-    padding: 10px 6px !important;
-    background: rgba(0,4,8,0.88) !important;
-    border-radius: 16px !important;
-    border: 1px solid rgba(255,255,255,0.07) !important;
-    backdrop-filter: blur(10px) !important;
-    -webkit-backdrop-filter: blur(10px) !important;
-    z-index: 62 !important;
-  }
-  .ctrl-btn { width: 58px !important; height: 58px !important; font-size: 20px !important; }
-  #screen-howto, #screen-skins, #screen-leaderboard {
-    overflow-y: auto !important; padding: 8px 12px 8px !important; justify-content: flex-start !important;
-  }
-}
 @media (max-width: 900px) and (max-height: 480px) and (orientation: landscape) {
   :root { --hud-h: 46px; }
   #scanlines { display: none; }
+  .menu-logo { font-size: clamp(28px, 6vw, 44px) !important; margin-bottom: 0 !important; }
+  .input-group { gap: 6px !important; width: min(260px, 50vw) !important; }
+  .btn-primary { padding: 10px 24px !important; font-size: 10px !important; }
+  .btn-secondary { padding: 8px 16px !important; font-size: 9px !important; }
+  #screen-menu { flex-direction: row; flex-wrap: wrap; gap: 8px; padding: 8px; align-items: center; justify-content: center; }
+  .menu-logo { width: 100%; text-align: center; }
+  .ctrl-btn { width: 60px !important; height: 60px !important; font-size: 18px !important; }
+  #mobile-controls { padding-bottom: 4px !important; padding-top: 4px !important; }
+  #screen-howto, #screen-skins, #screen-leaderboard {
+    overflow-y: auto !important; padding: 8px !important; justify-content: flex-start !important;
+  }
 }
 @media (min-width: 481px) and (max-width: 599px) {
   #scanlines { display: none; }
@@ -468,13 +417,9 @@ html, body {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
-@media (orientation: landscape) and (max-height: 500px) {
-  #scores { gap: 12px !important; padding: max(4px, env(safe-area-inset-top, 4px)) 20px 4px !important; }
-  .score-val { font-size: clamp(22px, 6vw, 32px) !important; }
-  #game-timer { font-size: clamp(16px, 4vw, 22px) !important; }
-  .score-label { font-size: 7px !important; }
-  #hud-skin-p0, #hud-skin-p1 { width: 22px !important; height: 22px !important; }
-  #opponent-label { font-size: 8px !important; top: calc(var(--hud-h, 46px) + 2px) !important; }
+@media (max-width: 480px) {
+  #scores { gap: 16px; padding: max(8px, env(safe-area-inset-top, 8px)) 16px 8px; }
+  :root { --hud-h: 48px; }
 }
 #game-timer {
   font-family:'Share Tech Mono', monospace;
@@ -515,52 +460,6 @@ html, body {
   background: linear-gradient(to top, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.5) 70%, transparent 100%);
   z-index:60;
 }
-/* Landscape: botões nas laterais, arena ocupa toda a altura */
-@media (max-height: 500px) and (orientation: landscape) {
-  #mobile-controls {
-    flex-direction: column;
-    width: auto; height: auto;
-    bottom: 50%; right: 8px; left: auto;
-    transform: translateY(50%);
-    gap: 10px;
-    padding: 10px 6px;
-    background: rgba(0,4,8,0.88);
-    border-radius: 16px;
-    border: 1px solid rgba(255,255,255,0.07);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    z-index: 62;
-  }
-  .ctrl-btn {
-    width: 60px !important; height: 60px !important;
-    font-size: 22px !important;
-  }
-  #swipe-zone {
-    right: 80px !important;
-    width: calc(100% - 80px) !important;
-  }
-}
-/* Overlay portrait */
-#rotate-overlay {
-  display:none; position:fixed; inset:0; z-index:9999;
-  background:#000408; flex-direction:column;
-  align-items:center; justify-content:center; gap:18px;
-}
-#rotate-overlay.show { display:flex; }
-#rotate-icon { font-size:64px; animation: rotHint 1.8s ease-in-out infinite; }
-@keyframes rotHint {
-  0%,100% { transform:rotate(0deg); }
-  40%,60% { transform:rotate(-90deg); }
-}
-#rotate-text {
-  font-family:'Orbitron',sans-serif; font-size:14px; font-weight:700;
-  letter-spacing:4px; color:var(--cyan);
-  text-shadow:0 0 20px rgba(0,238,255,0.6); text-align:center;
-}
-#rotate-sub {
-  font-family:'Share Tech Mono',monospace; font-size:10px;
-  color:rgba(255,255,255,0.25); letter-spacing:2px; text-align:center;
-}
 .ctrl-btn {
   font-family:'Orbitron', sans-serif;
   font-size:clamp(16px, 4vw, 28px); font-weight:900;
@@ -588,14 +487,6 @@ html, body {
   bottom:max(clamp(96px,17vw,130px), calc(clamp(96px,17vw,130px) + env(safe-area-inset-bottom, 0px)));
   width:100%;
   z-index:55; display:none;
-}
-@media (orientation: landscape) and (max-height: 500px) {
-  #swipe-zone {
-    bottom: 0 !important;
-    right: 76px !important;
-    width: calc(100% - 76px) !important;
-    left: 0 !important;
-  }
 }
 
 /* ── MATH OVERLAY ── */
@@ -965,11 +856,10 @@ html, body {
 .map-roulette-item.active { border-color:var(--gold); box-shadow:0 0 20px rgba(255,204,0,0.4); }
 .map-roulette-item.active img { filter: brightness(1) saturate(1.2); }
 .map-roulette-item.active .map-label { color:var(--gold); }
-#map-chosen-display { font-size:clamp(16px,4vw,26px); font-weight:900; letter-spacing:3px; color:var(--gold); text-shadow:0 0 30px rgba(255,204,0,0.7); opacity:0; transform:scale(0.8); transition: opacity .4s, transform .4s; min-height:40px; text-align:center; }
+#map-chosen-display { font-size:clamp(20px,6vw,32px); font-weight:900; letter-spacing:4px; color:var(--gold); text-shadow:0 0 30px rgba(255,204,0,0.7); opacity:0; transform:scale(0.8); transition: opacity .4s, transform .4s; min-height:40px; }
 #map-chosen-display.show { opacity:1; transform:scale(1); }
 
-/* ── SCORE VAL INSIDE FLEX WRAPPER ── */
-#s0 .score-val, #s1 .score-val { display: inline-block; }
+/* ── SCROLLBARS ── */
 #screen-howto::-webkit-scrollbar, #screen-skins::-webkit-scrollbar, #screen-leaderboard::-webkit-scrollbar, #screen-win::-webkit-scrollbar { width: 4px; }
 #screen-howto::-webkit-scrollbar-track, #screen-skins::-webkit-scrollbar-track, #screen-leaderboard::-webkit-scrollbar-track, #screen-win::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
 #screen-howto::-webkit-scrollbar-thumb, #screen-skins::-webkit-scrollbar-thumb, #screen-leaderboard::-webkit-scrollbar-thumb, #screen-win::-webkit-scrollbar-thumb { background: rgba(0,238,255,0.2); border-radius: 2px; }
@@ -997,13 +887,6 @@ html, body {
 </style>
 </head>
 <body>
-
-<!-- PORTRAIT OVERLAY -->
-<div id="rotate-overlay">
-  <div id="rotate-icon">📱</div>
-  <div id="rotate-text">VIRE O CELULAR</div>
-  <div id="rotate-sub">MATH PONG RODA EM LANDSCAPE</div>
-</div>
 
 <!-- THREE.JS CANVAS - renderização 3D principal -->
 <canvas id="three-canvas"></canvas>
@@ -1086,10 +969,7 @@ html, body {
   <div id="scores">
     <div class="score-block" id="s0">
       <div class="score-label" id="label0">P1</div>
-      <div style="display:flex;align-items:center;gap:6px;justify-content:center;">
-        <canvas id="hud-skin-p0" width="28" height="28" style="border-radius:6px;opacity:0.85;flex-shrink:0;"></canvas>
-        <div class="score-val">0</div>
-      </div>
+      <div class="score-val">0</div>
     </div>
     <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
       <div id="game-timer">3:00</div>
@@ -1097,10 +977,7 @@ html, body {
     </div>
     <div class="score-block" id="s1">
       <div class="score-label" id="label1">P2</div>
-      <div style="display:flex;align-items:center;gap:6px;justify-content:center;">
-        <div class="score-val">0</div>
-        <canvas id="hud-skin-p1" width="28" height="28" style="border-radius:6px;opacity:0.85;flex-shrink:0;"></canvas>
-      </div>
+      <div class="score-val">0</div>
     </div>
   </div>
 </div>
@@ -1260,104 +1137,86 @@ function initThree() {
   const canvas = document.getElementById('three-canvas');
 
   threeRenderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false });
-  threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_MOBILE ? 1.5 : 2));
+  threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   threeRenderer.setSize(window.innerWidth, window.innerHeight);
   threeRenderer.shadowMap.enabled = false;
   threeRenderer.toneMapping = THREE.ACESFilmicToneMapping;
-  threeRenderer.toneMappingExposure = 1.2;
+  threeRenderer.toneMappingExposure = 1.1;
 
   threeScene = new THREE.Scene();
-  threeScene.fog = new THREE.FogExp2(0x000408, 0.04);
+  threeScene.fog = new THREE.FogExp2(0x000408, 0.025);
 
-  // Camera — always top-down orthographic-style perspective
-  // Arena is 24 wide (X) × 8 deep (Z). We need to fit it in the viewport.
-  threeCamera = new THREE.PerspectiveCamera(
-    _calcFOV(), window.innerWidth / window.innerHeight, 0.1, 120
-  );
-  _positionCamera();
+  threeCamera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 200);
+  _setCameraForViewport();
 
   buildArena();
   buildPaddlesAndBall();
   buildLighting();
 
   window.addEventListener('resize', onThreeResize);
-  window.addEventListener('orientationchange', () => setTimeout(onThreeResize, 300));
   threeLoop();
 }
 
-// Calculate FOV so the 24-unit wide arena always fits in the viewport
-function _calcFOV() {
+// Arena is 24 wide (X) × 8 deep (Z), centered at origin, floor at y=-0.5
+// Camera sits above and slightly back, looking straight down at origin
+function _setCameraForViewport() {
+  // Place camera high above center — use FOV + height to frame the 24×8 arena
+  // We need tan(fov/2) * camHeight >= half the arena width in the narrowest screen dimension
   const aspect = window.innerWidth / window.innerHeight;
-  const h = 9; // camera height
+  const isPortrait = aspect < 1;
 
-  if (aspect >= 1) {
-    // Landscape: arena X=±9 (18u wide) must fit horizontally.
-    // halfFovH = atan(10.5/h), convert to vertical fov
-    const halfFovH = Math.atan2(10.5, h);
-    const halfFovV = Math.atan(Math.tan(halfFovH) / aspect);
-    return Math.min(90, Math.max(38, halfFovV * 2 * 180 / Math.PI));
+  // The arena is 24 wide. In portrait the screen width is the constraint.
+  // In landscape the screen height is the constraint (arena 8 deep).
+  // Use a high camera + wide FOV to see everything.
+  let camY, fov;
+  if (isPortrait) {
+    fov  = 80;
+    // tan(40°) * camY >= 12 (half arena width)  → camY >= 12/tan(40°) ≈ 14.3
+    camY = 15;
   } else {
-    // Portrait: arena Z=±4.2 (8.4u deep) must fit vertically
-    const halfFovV = Math.atan2(5.5, h);
-    return Math.min(90, Math.max(38, halfFovV * 2 * 180 / Math.PI));
+    fov  = 65;
+    camY = 13;
   }
-}
 
-function _positionCamera() {
-  threeCamera.position.set(0, 9, 0);
+  threeCamera.fov    = fov;
+  threeCamera.aspect = aspect;
+  threeCamera.updateProjectionMatrix();
+  threeCamera.position.set(0, camY, 0.01); // tiny z offset prevents gimbal lock
   threeCamera.up.set(0, 0, -1);
   threeCamera.lookAt(0, 0, 0);
-}
 
-function _getHUDOffset() {
-  // In landscape mobile, shift the camera look-at to account for HUD at top
-  // and mobile controls at bottom, so the arena is centered in the playable area
-  const isLandscape = window.innerWidth > window.innerHeight;
-  const isMobileView = window.innerWidth <= 1024 && (navigator.maxTouchPoints > 0 || 'ontouchstart' in window);
-  if (!isLandscape || !isMobileView) return 0;
-  const hudH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hud-h')) || 46;
-  const ctrlH = 76; // approx control button height in landscape
-  const totalH = window.innerHeight;
-  // Shift look-at point in Z to center between HUD and controls
-  const offsetPx = (hudH - ctrlH) / 2;
-  const offsetFrac = offsetPx / totalH;
-  return offsetFrac * 8.4; // 8.4 = arena depth in Three units
+  BASE_CAM.x = 0;
+  BASE_CAM.y = camY;
+  BASE_CAM.z = 0;
 }
 
 function onThreeResize() {
-  threeCamera.fov = _calcFOV();
-  threeCamera.aspect = window.innerWidth / window.innerHeight;
-  threeCamera.updateProjectionMatrix();
-  threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_MOBILE ? 1.5 : 2));
   threeRenderer.setSize(window.innerWidth, window.innerHeight);
-  _positionCamera();
-  const zo = _getHUDOffset();
-  BASE_CAM.x = 0; BASE_CAM.y = 9; BASE_CAM.z = zo;
-  threeCamera.lookAt(0, 0, zo);
+  _setCameraForViewport();
 }
 
 function buildLighting() {
-  // Strong ambient so top-down view looks good
-  const amb = new THREE.AmbientLight(0x223355, 2.5);
+  // Strong ambient for top-down view
+  const amb = new THREE.AmbientLight(0x334466, 3.5);
   threeScene.add(amb);
 
-  // Main directional from above
-  const dir = new THREE.DirectionalLight(0x99ddff, 1.2);
-  dir.position.set(0, 20, 0);
+  // Directional from directly above
+  const dir = new THREE.DirectionalLight(0xaaccff, 1.5);
+  dir.position.set(0, 20, 1);
   threeScene.add(dir);
 
-  // Cyan accent — left side (P1)
-  const pL = new THREE.PointLight(0x00eeff, 4.0, 18);
+  // Cyan accent — left side (P1 goal)
+  const pL = new THREE.PointLight(0x00eeff, 5.0, 20);
   pL.position.set(-9, 1, 0);
   threeScene.add(pL);
 
-  // Red accent — right side (P2)
-  const pR = new THREE.PointLight(0xff4466, 4.0, 18);
+  // Red accent — right side (P2 goal)
+  const pR = new THREE.PointLight(0xff4466, 5.0, 20);
   pR.position.set(9, 1, 0);
   threeScene.add(pR);
 
-  // Center top — gold
-  const pC = new THREE.PointLight(0xffcc00, 2.0, 14);
+  // Center gold light
+  const pC = new THREE.PointLight(0xffcc00, 2.5, 14);
   pC.position.set(0, 2, 0);
   threeScene.add(pC);
 
@@ -1367,57 +1226,51 @@ function buildLighting() {
 }
 
 function buildArena() {
-  // Floor — dark reflective surface
-  const floorGeo = new THREE.PlaneGeometry(24, 14);
+  // Floor
+  const floorGeo = new THREE.PlaneGeometry(26, 12);
   const floorMat = new THREE.MeshStandardMaterial({
-    color: 0x020d1a,
-    roughness: 0.4,
-    metalness: 0.6,
+    color: 0x020e1f, roughness: 0.5, metalness: 0.5,
   });
   threeFloor = new THREE.Mesh(floorGeo, floorMat);
   threeFloor.rotation.x = -Math.PI / 2;
   threeFloor.position.y = -0.5;
   threeScene.add(threeFloor);
 
-  // Grid lines on floor — brighter for top-down
-  const gridHelper = new THREE.GridHelper(22, 22, 0x00eeff, 0x002244);
-  gridHelper.position.y = -0.49;
-  gridHelper.material.opacity = 0.25;
+  // Grid — visible from above
+  const gridHelper = new THREE.GridHelper(24, 24, 0x004466, 0x001122);
+  gridHelper.position.y = -0.48;
+  gridHelper.material.opacity = 0.35;
   gridHelper.material.transparent = true;
   threeScene.add(gridHelper);
 
-  // Center line — vertical glowing bar
-  const clGeo = new THREE.BoxGeometry(0.04, 0.02, 8);
-  const clMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.6 });
-  threeCenterLine = new THREE.Mesh(clGeo, clMat);
-  threeCenterLine.position.set(0, -0.48, 0);
-  threeScene.add(threeCenterLine);
-
-  // Dashed center — evenly spaced dots
-  for (let i = -3.5; i <= 3.5; i += 1) {
-    const dGeo = new THREE.BoxGeometry(0.05, 0.025, 0.4);
-    const dMat = new THREE.MeshStandardMaterial({ color: 0x00eeff, emissive: 0x00eeff, emissiveIntensity: 0.8 });
-    const d = new THREE.Mesh(dGeo, dMat);
-    d.position.set(0, -0.48, i);
-    threeScene.add(d);
+  // Center dashed line
+  for (let i = -4.5; i <= 4.5; i += 1.1) {
+    const dMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.04, 0.55),
+      new THREE.MeshStandardMaterial({ color: 0x00eeff, emissive: 0x00eeff, emissiveIntensity: 1.5 })
+    );
+    dMesh.position.set(0, -0.46, i);
+    threeScene.add(dMesh);
   }
 
-  // Top wall neon strip
-  buildWallStrip(0, -0.4, -4.5, 20, 0x00eeff);
-  buildWallStrip(0, -0.4,  4.5, 20, 0xff4466);
+  // Top/bottom wall neon strips
+  buildWallStrip(0, -0.4, -4.8, 22, 0x00eeff);
+  buildWallStrip(0, -0.4,  4.8, 22, 0xff4466);
 
-  // Side wall glow planes
-  const sideMatC = new THREE.MeshStandardMaterial({ color: 0x00eeff, emissive: 0x00eeff, emissiveIntensity: 0.15, transparent: true, opacity: 0.06 });
-  const sideMatR = new THREE.MeshStandardMaterial({ color: 0xff4466, emissive: 0xff4466, emissiveIntensity: 0.15, transparent: true, opacity: 0.06 });
-  const sideGeo = new THREE.PlaneGeometry(14, 2);
-  const wallL = new THREE.Mesh(sideGeo, sideMatC);
-  wallL.rotation.y = Math.PI / 2;
-  wallL.position.set(-10, 0.5, 0);
-  threeScene.add(wallL);
-  const wallR = new THREE.Mesh(sideGeo, sideMatR);
-  wallR.rotation.y = -Math.PI / 2;
-  wallR.position.set(10, 0.5, 0);
-  threeScene.add(wallR);
+  // Goal zone glows
+  const gGeoL = new THREE.PlaneGeometry(1.5, 9.6);
+  const gMatL = new THREE.MeshStandardMaterial({ color: 0x00eeff, emissive: 0x00eeff, emissiveIntensity: 0.4, transparent: true, opacity: 0.07 });
+  const goalL = new THREE.Mesh(gGeoL, gMatL);
+  goalL.rotation.x = -Math.PI / 2;
+  goalL.position.set(-10.5, -0.45, 0);
+  threeScene.add(goalL);
+
+  const gGeoR = new THREE.PlaneGeometry(1.5, 9.6);
+  const gMatR = new THREE.MeshStandardMaterial({ color: 0xff4466, emissive: 0xff4466, emissiveIntensity: 0.4, transparent: true, opacity: 0.07 });
+  const goalR = new THREE.Mesh(gGeoR, gMatR);
+  goalR.rotation.x = -Math.PI / 2;
+  goalR.position.set(10.5, -0.45, 0);
+  threeScene.add(goalR);
 }
 
 function buildWallStrip(x, y, z, w, color) {
@@ -1677,7 +1530,8 @@ const BALL_SKINS_3D = {
     emoji: '✖',
     build() {
       const g = new THREE.Group();
-      const mat = new THREE.MeshStandardMaterial({ color: 0x9b8fe8, emissive: 0x6644cc, emissiveIntensity: 3.0, roughness: 0.2, metalness: 0.3 });
+      const mat = new THREE.MeshStandardMaterial({ color: 0x9b8fe8, emissive: 0x6644cc, emissiveIntensity: 1.2, roughness: 0.2, metalness: 0.3 });
+      // Two crossing bars
       const bar1 = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.18, 0.18), mat);
       bar1.rotation.z = Math.PI / 4;
       g.add(bar1);
@@ -1694,7 +1548,7 @@ const BALL_SKINS_3D = {
       const g = new THREE.Group();
       const sphere = new THREE.Mesh(
         new THREE.SphereGeometry(0.3, 24, 24),
-        new THREE.MeshStandardMaterial({ color: 0x00eeff, emissive: 0x0066aa, emissiveIntensity: 3.0, roughness: 0.05, metalness: 0.9 })
+        new THREE.MeshStandardMaterial({ color: 0x00eeff, emissive: 0x0066aa, emissiveIntensity: 0.8, roughness: 0.05, metalness: 0.9 })
       );
       g.add(sphere);
       return g;
@@ -1759,16 +1613,16 @@ const BALL_SKINS_3D = {
     build() {
       const g = new THREE.Group();
       const nucleus = new THREE.Mesh(
-        new THREE.SphereGeometry(0.18, 12, 12),
-        new THREE.MeshStandardMaterial({ color: 0x00ff88, emissive: 0x00cc44, emissiveIntensity: 2.0 })
+        new THREE.SphereGeometry(0.12, 12, 12),
+        new THREE.MeshStandardMaterial({ color: 0x00ff88, emissive: 0x00cc44, emissiveIntensity: 1.2 })
       );
       g.add(nucleus);
-      // 3 orbital rings — bigger and more visible from top
-      const ringMat = new THREE.MeshStandardMaterial({ color: 0x00ff88, emissive: 0x00ff88, emissiveIntensity: 1.5, roughness: 0.1 });
+      // 3 orbital rings
+      const ringMat = new THREE.MeshStandardMaterial({ color: 0x00ff88, emissive: 0x00ff88, emissiveIntensity: 0.8, roughness: 0.1 });
       for (let i = 0; i < 3; i++) {
         const ring = new THREE.Mesh(
-          new THREE.TorusGeometry(0.36, 0.04, 8, 32),
-          ringMat.clone()
+          new THREE.TorusGeometry(0.28, 0.025, 8, 32),
+          ringMat
         );
         ring.rotation.set(i * Math.PI / 3, i * Math.PI / 4, 0);
         g.add(ring);
@@ -1800,18 +1654,12 @@ const BALL_SKINS_3D = {
     emoji: 'π',
     build() {
       const g = new THREE.Group();
+      // Gold sphere with PI embossed look
       const sphere = new THREE.Mesh(
         new THREE.SphereGeometry(0.28, 20, 20),
-        new THREE.MeshStandardMaterial({ color: 0xffcc00, emissive: 0xffaa00, emissiveIntensity: 2.0, roughness: 0.15, metalness: 0.6 })
+        new THREE.MeshStandardMaterial({ color: 0xffcc00, emissive: 0xffaa00, emissiveIntensity: 0.8, roughness: 0.15, metalness: 0.6 })
       );
       g.add(sphere);
-      // Add a flat glowing ring so it looks like π from above
-      const ring = new THREE.Mesh(
-        new THREE.TorusGeometry(0.38, 0.05, 8, 32),
-        new THREE.MeshStandardMaterial({ color: 0xffcc00, emissive: 0xffdd00, emissiveIntensity: 2.0 })
-      );
-      ring.rotation.x = Math.PI / 2; // flat ring visible from top
-      g.add(ring);
       return g;
     }
   },
@@ -1823,7 +1671,6 @@ let selectedBallSkin   = localStorage.getItem('mathpong_ball_skin')   || 'xmark'
 
 function buildPaddlesAndBall() {
   if (!threeScene) return;
-  // Remove old
   if (threePaddle0) { threeScene.remove(threePaddle0); }
   if (threePaddle1) { threeScene.remove(threePaddle1); }
   if (threeBall)    { threeScene.remove(threeBall); }
@@ -1831,34 +1678,22 @@ function buildPaddlesAndBall() {
   const skinDef = PADDLE_SKINS_3D[selectedPaddleSkin] || PADDLE_SKINS_3D['neon'];
 
   threePaddle0 = skinDef.build(0x00eeff);
-  threePaddle0.position.set(-9, 0, 0);
-  // Rotate paddle to lie flat — visible from top-down
-  // Original paddles are tall (Y axis). Rotate so height goes along Z axis.
-  threePaddle0.rotation.x = Math.PI / 2;
-  threePaddle0.scale.set(1.5, 1.2, 1.2); // scale up for visibility
+  threePaddle0.position.set(-9, 0.2, 0);
+  // No rotation — paddles are tall (Y), which maps to Z in top-down view correctly
+  // Scale: X=thickness, Y=height(visible as Z from top), Z=depth
+  threePaddle0.scale.set(0.8, 1.0, 0.8);
   threeScene.add(threePaddle0);
 
   threePaddle1 = skinDef.build(0xff4466);
-  threePaddle1.position.set(9, 0, 0);
-  threePaddle1.rotation.x = Math.PI / 2;
-  threePaddle1.scale.set(1.5, 1.2, 1.2);
+  threePaddle1.position.set(9, 0.2, 0);
+  threePaddle1.scale.set(0.8, 1.0, 0.8);
   threeScene.add(threePaddle1);
 
   const ballDef = BALL_SKINS_3D[selectedBallSkin] || BALL_SKINS_3D['xmark'];
   threeBall = ballDef.build();
   threeBall.position.set(0, 0.3, 0);
-  threeBall.scale.setScalar(1.6); // bigger for top-down visibility
+  threeBall.scale.setScalar(1.4);
   threeScene.add(threeBall);
-
-  // Update HUD skin previews
-  updateHUDSkins();
-}
-
-function updateHUDSkins() {
-  const c0 = document.getElementById('hud-skin-p0');
-  const c1 = document.getElementById('hud-skin-p1');
-  if (c0) drawSkinPreview2D(c0, 'paddle', selectedPaddleSkin, false);
-  if (c1) drawSkinPreview2D(c1, 'paddle', selectedPaddleSkin, true);
 }
 
 // ── COORDINATE MAPPING ───────────────────────────────────────────────────────
@@ -1959,7 +1794,7 @@ let ballRotSpeed = { x: 0.03, y: 0.05, z: 0.02 };
 
 // ── CAMERA CINEMATIC ─────────────────────────────────────────────────────────
 let camShake = 0;
-let BASE_CAM = { x: 0, y: 9, z: 0 };
+let BASE_CAM = { x: 0, y: 15, z: 0 };
 
 // ── MAIN RENDER LOOP ─────────────────────────────────────────────────────────
 let globalTime = 0;
@@ -1978,17 +1813,17 @@ function threeLoop() {
     window._threePointR.intensity = 2.5 + Math.cos(globalTime * 1.1) * 0.4;
   }
 
-  // Camera shake on goal
+  // Camera shake on goal — shake X/Z only (camera is top-down)
   if (camShake > 0) {
-    threeCamera.position.x = BASE_CAM.x + (Math.random() - 0.5) * camShake * 0.5;
-    threeCamera.position.z = BASE_CAM.z + (Math.random() - 0.5) * camShake * 0.5;
+    threeCamera.position.x = BASE_CAM.x + (Math.random() - 0.5) * camShake * 0.6;
+    threeCamera.position.z = BASE_CAM.z + (Math.random() - 0.5) * camShake * 0.6;
     camShake -= 0.06;
   } else {
     threeCamera.position.x += (BASE_CAM.x - threeCamera.position.x) * 0.1;
     threeCamera.position.y += (BASE_CAM.y - threeCamera.position.y) * 0.1;
     threeCamera.position.z += (BASE_CAM.z - threeCamera.position.z) * 0.1;
   }
-  threeCamera.lookAt(BASE_CAM.x, 0, BASE_CAM.z);
+  threeCamera.lookAt(0, 0, 0);
 
   if (gameRunning3D) {
     // Sync paddle positions
@@ -1999,9 +1834,7 @@ function threeLoop() {
       const tz = gameToThreeZ(p0y);
       threePaddle0.position.z += (tz - threePaddle0.position.z) * 0.25;
       const ts = paddleScaleP0;
-      // After rotation.x=PI/2, Y scale controls the Z spread (paddle width)
-      threePaddle0.scale.set(1.5, ts * 1.2, 1.2);
-      // Glow hit
+      threePaddle0.scale.set(0.8, ts, 0.8);
       if (paddleHitGlow[0] > 0) {
         threePaddle0.traverse(m => { if (m.isMesh && m.material.emissive) m.material.emissiveIntensity = 0.8 + paddleHitGlow[0] * 2; });
         paddleHitGlow[0] -= 0.1;
@@ -2011,7 +1844,7 @@ function threeLoop() {
       const tz = gameToThreeZ(p1y);
       threePaddle1.position.z += (tz - threePaddle1.position.z) * 0.25;
       const ts = paddleScaleP1;
-      threePaddle1.scale.set(1.5, ts * 1.2, 1.2);
+      threePaddle1.scale.set(0.8, ts, 0.8);
       if (paddleHitGlow[1] > 0) {
         threePaddle1.traverse(m => { if (m.isMesh && m.material.emissive) m.material.emissiveIntensity = 0.8 + paddleHitGlow[1] * 2; });
         paddleHitGlow[1] -= 0.1;
@@ -2057,12 +1890,6 @@ function threeLoop() {
 
 // Initialize Three.js
 initThree();
-// Apply HUD offset now that DOM is ready
-(function() {
-  const zo = _getHUDOffset();
-  BASE_CAM.z = zo;
-  threeCamera.lookAt(0, 0, zo);
-})();
 initParticlePool();
 if (!IS_MOBILE) initTrail();
 
@@ -2528,6 +2355,14 @@ socket.on('score_update', data => {
     const scorerEl = document.querySelector(`#s${data.scorer} .score-val`);
     if (scorerEl) { scorerEl.style.transform = 'scale(1.5)'; scorerEl.style.transition = 'transform 0.15s'; setTimeout(()=>{scorerEl.style.transform='scale(1)';},350); }
     showReadyFlash();
+
+    // 2-point win condition
+    if (scores[0] >= 2 || scores[1] >= 2) {
+      const winIdx = scores[0] >= 2 ? 0 : 1;
+      setTimeout(() => {
+        showGameOver(winIdx === myIdx ? myName : 'ADVERSÁRIO', scores);
+      }, 900);
+    }
   }
 
   const msb0 = document.getElementById('msb-score0'); const msb1 = document.getElementById('msb-score1');
@@ -2810,7 +2645,7 @@ function spinMapRoulette() {
         track.querySelectorAll('.map-roulette-item').forEach((el,i) => el.classList.toggle('active', i === landingIdx));
         title.textContent = '✅ MAPA ESCOLHIDO!';
         status.textContent = `${winner.emoji} ${winner.label}`; status.classList.add('chosen');
-        chosen.textContent = `${winner.emoji} ${winner.label}`; chosen.classList.add('show');
+        chosen.textContent = winner.emoji; chosen.classList.add('show');
         SFX.rouletteResult?.();
         applyMap(winner.id);
         setTimeout(() => {
@@ -2879,8 +2714,7 @@ function activateSwipeZone() {
     const dy  = e.touches[0].clientY - lastY;
     lastY = e.touches[0].clientY;
     const dir = dy > 0 ? 1 : -1;
-    const sens = window.innerWidth > window.innerHeight ? 9 : 20;
-    movePaddle(dir * Math.min(1, Math.abs(dy) / sens));
+    movePaddle(dir * Math.min(1, Math.abs(dy) / 20));
   };
 }
 function deactivateSwipeZone() {
@@ -2951,7 +2785,6 @@ socket.on('match_found', data => {
 
   gameRunning3D = true;
   activateSwipeZone();
-  updateHUDSkins();
   spinMapRoulette().then(() => startCountdown());
 });
 
@@ -2989,7 +2822,6 @@ function startAIGame() {
 
   gameRunning3D = true;
   activateSwipeZone();
-  updateHUDSkins();
 
   spinMapRoulette().then(() => {
     startCountdown();
@@ -3005,7 +2837,7 @@ function startAIGame() {
       const now = Date.now(), dt = (now - lastTick) / 1000;
       lastTick = now;
 
-      if (!aiMathActive && !gamePaused) {
+      if (!aiMathActive) {
         timeLeft -= dt;
         if (timeLeft <= 0) { endAIGame(); return; }
         const t = Math.max(0, Math.floor(timeLeft));
@@ -3016,16 +2848,13 @@ function startAIGame() {
       }
 
       const b = ballState;
-      if (!gamePaused) {
-        b.x += b.vx; b.y += b.vy;
-      }
+      b.x += b.vx; b.y += b.vy;
       const prevVy = b.vy;
       if (b.y < -1 + BALL_R_CLIENT) { b.y = -1 + BALL_R_CLIENT; b.vy = Math.abs(b.vy); SFX.wallHit(); }
       if (b.y >  1 - BALL_R_CLIENT) { b.y =  1 - BALL_R_CLIENT; b.vy = -Math.abs(b.vy); SFX.wallHit(); }
 
       window._ballX = b.x; window._ballY = b.y;
 
-      if (!gamePaused) {
       // Player paddle hit
       if (b.x < -0.86 + BALL_R_CLIENT && b.vx < 0) {
         if (Math.abs(b.y - myPaddleY) < (PADDLE_H_CLIENT * paddleScaleP0) + BALL_R_CLIENT) {
@@ -3034,15 +2863,14 @@ function startAIGame() {
           const angle = relY * Math.PI * 0.38;
           b.vx = Math.abs(Math.cos(angle)) * BALL_SPEED_CLIENT;
           b.vy = Math.sin(angle) * BALL_SPEED_CLIENT;
-          // Normalize speed to exactly BALL_SPEED_CLIENT
+          // Clamp speed to prevent accumulation
           const spd = Math.hypot(b.vx, b.vy);
-          b.vx = (b.vx / spd) * BALL_SPEED_CLIENT;
-          b.vy = (b.vy / spd) * BALL_SPEED_CLIENT;
+          if (spd > BALL_SPEED_CLIENT * 1.5) { b.vx *= BALL_SPEED_CLIENT / spd; b.vy *= BALL_SPEED_CLIENT / spd; }
           paddleHitGlow[0] = 1.0;
           spawnParticles3D(gameToThreeX(b.x), gameToThreeZ(b.y), 0x00eeff, IS_MOBILE ? 8 : 16);
           SFX.paddleHit();
           aiRally++;
-          if (aiRally % 3 === 0 && !aiMathActive && Math.abs(b.x) < 0.9) { aiMathActive = true; triggerAIMath(() => { aiMathActive = false; }); }
+          if (aiRally % 3 === 0 && !aiMathActive) { aiMathActive = true; triggerAIMath(() => { aiMathActive = false; }); }
         }
       }
 
@@ -3054,10 +2882,9 @@ function startAIGame() {
           const angle = relY * Math.PI * 0.38;
           b.vx = -Math.abs(Math.cos(angle)) * BALL_SPEED_CLIENT;
           b.vy = Math.sin(angle) * BALL_SPEED_CLIENT;
-          // Normalize speed to exactly BALL_SPEED_CLIENT
+          // Clamp speed
           const spd = Math.hypot(b.vx, b.vy);
-          b.vx = (b.vx / spd) * BALL_SPEED_CLIENT;
-          b.vy = (b.vy / spd) * BALL_SPEED_CLIENT;
+          if (spd > BALL_SPEED_CLIENT * 1.5) { b.vx *= BALL_SPEED_CLIENT / spd; b.vy *= BALL_SPEED_CLIENT / spd; }
           paddleHitGlow[1] = 1.0;
           spawnParticles3D(gameToThreeX(b.x), gameToThreeZ(b.y), 0xff4466, IS_MOBILE ? 8 : 16);
           SFX.paddleHit();
@@ -3069,7 +2896,6 @@ function startAIGame() {
       oppPaddleY += (aiTarget - oppPaddleY) * aiDifficulty;
       oppPaddleY = Math.max(-1+PADDLE_H_CLIENT, Math.min(1-PADDLE_H_CLIENT, oppPaddleY));
       window._oppPaddleY = oppPaddleY;
-      } // end !gamePaused
 
       if (b.x < -1.05) { aiPoint(1); }
       if (b.x >  1.05) { aiPoint(0); }
@@ -3085,9 +2911,21 @@ function aiPoint(scorerIdx) {
   camShake = 0.9;
   spawnParticles3D(scorerIdx === 0 ? -9 : 9, 0, scorerIdx === 0 ? 0x00eeff : 0xff4466, IS_MOBILE ? 12 : 25);
   const el = document.querySelector(`#s${scorerIdx} .score-val`);
-  if(el) { el.style.transform='scale(1.5)'; setTimeout(()=>el.style.transform='scale(1)',350); }
+  if (el) { el.style.transform='scale(1.5)'; setTimeout(()=>el.style.transform='scale(1)',350); }
   paddleScaleP0=1.0; paddleScaleP1=1.0; reverseControls=false;
   ballState = {x:0,y:0,vx:0,vy:0}; window._ballX=0; window._ballY=0;
+
+  // 2-point win condition
+  if (scores[scorerIdx] >= 2) {
+    clearInterval(window._aiInterval);
+    window._aiInterval = null;
+    aiMode = false;
+    setTimeout(() => {
+      showGameOver(scorerIdx === 0 ? 'JOGADOR' : 'I.A.', scores);
+    }, 800);
+    return;
+  }
+
   showReadyFlash();
   setTimeout(() => {
     if (!aiMode) return;
@@ -3208,16 +3046,57 @@ function genLocalQuestion() {
   return {question:`${text} = ?`, choices, correct_idx:choices.indexOf(answer), time_limit:10};
 }
 
-function endAIGame() {
-  if (!aiMode) return;
+function showGameOver(winnerName, finalScores) {
+  // Stop AI loop
+  if (window._aiInterval) { clearInterval(window._aiInterval); window._aiInterval = null; }
+  if (typeof aiInterval !== 'undefined') clearInterval(aiInterval);
   aiMode = false; window._aiMathLock = false;
-  clearInterval(aiInterval);
   const ao = document.getElementById('ai-math-overlay');
   if (ao) ao.style.display = 'none';
-  hide('hud'); hide('opponent-label'); hide('mobile-controls');
-  deactivateSwipeZone();
+  gamePaused = true;
+
+  // Show overlay
+  let overlay = document.getElementById('gameover-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'gameover-overlay';
+    overlay.style.cssText = `
+      position:fixed;inset:0;z-index:300;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+      background:rgba(0,2,10,0.97);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
+    `;
+    document.body.appendChild(overlay);
+  }
+  const isPlayerWin = winnerName === 'JOGADOR' || winnerName === myName;
+  overlay.innerHTML = `
+    <div style="font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:6px;color:rgba(255,255,255,0.4);margin-bottom:4px;">PARTIDA ENCERRADA</div>
+    <div style="font-family:'Orbitron',sans-serif;font-size:clamp(28px,8vw,52px);font-weight:900;
+      color:${isPlayerWin ? 'var(--cyan,#00eeff)' : 'var(--red,#ff4466)'};
+      text-shadow:0 0 40px ${isPlayerWin ? '#00eeff' : '#ff4466'};
+      letter-spacing:4px;">
+      ${isPlayerWin ? '🏆 VITÓRIA!' : '💀 DERROTA'}
+    </div>
+    <div style="font-family:'Orbitron',sans-serif;font-size:clamp(36px,10vw,64px);font-weight:900;
+      color:#fff;letter-spacing:8px;text-shadow:0 0 20px rgba(255,255,255,0.3);">
+      ${finalScores[0]} <span style="font-size:0.5em;color:rgba(255,255,255,0.4)">VS</span> ${finalScores[1]}
+    </div>
+    <div style="font-family:'Orbitron',sans-serif;font-size:13px;letter-spacing:3px;
+      color:${isPlayerWin ? 'var(--cyan,#00eeff)' : 'var(--red,#ff4466)'};">
+      ${winnerName} VENCEU
+    </div>
+    <button onclick="document.getElementById('gameover-overlay').style.display='none';goMenu();"
+      style="margin-top:16px;font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:4px;
+      padding:14px 32px;border-radius:12px;border:1px solid rgba(255,255,255,0.15);
+      background:rgba(255,255,255,0.06);color:#fff;cursor:pointer;">
+      MENU PRINCIPAL
+    </button>
+  `;
+  overlay.style.display = 'flex';
+}
+
+function endAIGame() {
   const winnerIdx = scores[0] >= scores[1] ? 0 : 1;
-  showWin({ winner_idx:winnerIdx, winner_name:winnerIdx===0?myName:'I.A.', winner_turma:winnerIdx===0?'MODO TREINO':'COMPUTADOR', scores, leaderboard:[] });
+  showGameOver(winnerIdx === 0 ? 'JOGADOR' : 'I.A.', scores);
 }
 
 // ── GO BACK TO MENU ───────────────────────────────────────────────────────────
@@ -3226,6 +3105,8 @@ function goMenu() {
   clearInterval(aiInterval);
   const ao = document.getElementById('ai-math-overlay');
   if (ao) ao.style.display = 'none';
+  const go = document.getElementById('gameover-overlay');
+  if (go) go.style.display = 'none';
   roomId = null; gamePaused = false; reverseControls = false;
   paddleScaleP0=1.0; paddleScaleP1=1.0;
   gameRunning3D = false;
@@ -3238,12 +3119,13 @@ function goMenu() {
   // Reset arena visuals
   applyMap('arena');
   // Reset Three.js objects
-  buildPaddlesAndBall(); // rebuilds with correct rotation/scale (also calls updateHUDSkins inside)
+  if (threePaddle0) { threePaddle0.position.set(-9,0,0); threePaddle0.scale.set(1,1,1); }
+  if (threePaddle1) { threePaddle1.position.set(9,0,0); threePaddle1.scale.set(1,1,1); }
+  if (threeBall)    { threeBall.position.set(0,0.1,0); }
+  buildPaddlesAndBall();
 }
 
 // (initThree already calls buildPaddlesAndBall internally)
-
-// Portrait is allowed — no rotation lock
 </script>
 </body>
 </html>
