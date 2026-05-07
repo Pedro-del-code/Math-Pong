@@ -164,7 +164,7 @@ class GameRoom:
     def _loop(self):
         TICK = 1 / 60
         _broadcast_acc = 0.0
-        BROADCAST_INTERVAL = 1 / 30  # envia state ao cliente em 30Hz; física roda em 60Hz
+        BROADCAST_INTERVAL = 1 / 60  # sincroniza com o cliente que roda a 60fps
 
         while self.running:
             t0 = time.perf_counter()
@@ -284,16 +284,20 @@ class GameRoom:
 
         winner_sid  = self.sids[winner_idx]
         winner_info = self.players[winner_sid]['info']
-        db_add_win(winner_info.get('id'))
-        leaderboard = db_get_leaderboard()
 
+        # Emite game_over imediatamente sem esperar o DB
         socketio.emit('game_over', {
             'winner_idx':   winner_idx,
             'winner_name':  winner_info['name'],
             'winner_turma': winner_info.get('turma', ''),
             'scores':       self.scores[:],
-            'leaderboard':  leaderboard,
+            'leaderboard':  [],
         }, room=self.room_id)
+
+        # Salva no DB em background sem bloquear nada
+        def save_result():
+            db_add_win(winner_info.get('id'))
+        threading.Thread(target=save_result, daemon=True).start()
 
     # ── MATEMÁTICA ───────────────────────────────────────────────────────────
 
@@ -705,6 +709,7 @@ def on_join_queue(data):
     except (ValueError, TypeError):
         level = 6
 
+    # Faz a chamada ao DB ANTES de adquirir o lock — evita bloquear o thread do SocketIO
     player_info = db_get_or_create_player(name, turma)
     player_info['level'] = level
 
@@ -759,6 +764,16 @@ def on_answer_math(data):
         except (ValueError, TypeError):
             idx = -1
         rooms[room_id].answer_math(sid, idx)
+
+
+@socketio.on('cancel_queue')
+def on_cancel_queue():
+    global waiting
+    sid = request.sid
+    with waiting_lock:
+        if waiting and waiting['sid'] == sid:
+            waiting = None
+            print(f"[QUEUE] {sid} cancelou a fila.")
 
 
 @socketio.on('disconnect')
