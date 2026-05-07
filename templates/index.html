@@ -54,20 +54,71 @@
   .ctrl-btn { width: clamp(68px, 18vw, 88px) !important; height: clamp(68px, 18vw, 88px) !important; font-size: clamp(20px, 5vw, 28px) !important; }
   #mobile-controls { padding-bottom: max(clamp(16px, 4vw, 24px), env(safe-area-inset-bottom, 16px)) !important; }
 }
+/* ── LANDSCAPE MOBILE (qualquer largura) ── */
+@media (orientation: landscape) and (max-height: 500px) {
+  :root { --hud-h: 46px; }
+  #scanlines { display: none; }
+  #screen-menu {
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 24px !important;
+    padding: max(8px, env(safe-area-inset-top, 8px)) max(8px, env(safe-area-inset-right, 8px)) max(8px, env(safe-area-inset-bottom, 8px)) max(8px, env(safe-area-inset-left, 8px)) !important;
+    overflow-y: hidden !important;
+  }
+  #menu-header {
+    width: auto !important;
+    flex-shrink: 0 !important;
+    padding: 0 8px !important;
+    align-items: center !important;
+  }
+  #menu-header::after { display: none; }
+  .menu-logo {
+    font-size: clamp(26px, 5vh, 42px) !important;
+    letter-spacing: 1px !important;
+    margin-bottom: 4px !important;
+    line-height: 1 !important;
+  }
+  .menu-badge { font-size: 7px !important; letter-spacing: 2px !important; margin-top: 4px !important; }
+  .menu-card {
+    margin-top: 0 !important;
+    padding: 12px 14px !important;
+    gap: 6px !important;
+    width: min(320px, 50vw) !important;
+    flex-shrink: 0 !important;
+  }
+  .input-group { gap: 5px !important; width: 100% !important; }
+  .input-group input { padding: 9px 14px !important; font-size: 11px !important; }
+  .serie-select { padding: 9px 28px 9px 12px !important; font-size: 10px !important; }
+  .btn-primary { padding: 10px 16px !important; font-size: 10px !important; min-height: 38px !important; }
+  .btn-secondary { padding: 7px 14px !important; font-size: 9px !important; min-height: 34px !important; }
+  .btn-action { padding: 7px 10px !important; font-size: 8px !important; }
+  .menu-divider { margin: 2px 0 !important; }
+  #menu-version { display: none !important; }
+  /* Controls landscape */
+  #mobile-controls {
+    flex-direction: column !important;
+    width: auto !important; height: auto !important;
+    bottom: 50% !important; right: max(8px, env(safe-area-inset-right, 8px)) !important; left: auto !important;
+    transform: translateY(50%) !important;
+    gap: 10px !important;
+    padding: 10px 6px !important;
+    background: rgba(0,4,8,0.88) !important;
+    border-radius: 16px !important;
+    border: 1px solid rgba(255,255,255,0.07) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    z-index: 62 !important;
+  }
+  .ctrl-btn { width: 58px !important; height: 58px !important; font-size: 20px !important; }
+  #screen-howto, #screen-skins, #screen-leaderboard {
+    overflow-y: auto !important; padding: 8px 12px 8px !important; justify-content: flex-start !important;
+  }
+}
 @media (max-width: 900px) and (max-height: 480px) and (orientation: landscape) {
   :root { --hud-h: 46px; }
   #scanlines { display: none; }
-  .menu-logo { font-size: clamp(28px, 6vw, 44px) !important; margin-bottom: 0 !important; }
-  .input-group { gap: 6px !important; width: min(260px, 50vw) !important; }
-  .btn-primary { padding: 10px 24px !important; font-size: 10px !important; }
-  .btn-secondary { padding: 8px 16px !important; font-size: 9px !important; }
-  #screen-menu { flex-direction: row; flex-wrap: wrap; gap: 8px; padding: 8px; align-items: center; justify-content: center; }
-  .menu-logo { width: 100%; text-align: center; }
-  .ctrl-btn { width: 60px !important; height: 60px !important; font-size: 18px !important; }
-  #mobile-controls { padding-bottom: 4px !important; padding-top: 4px !important; }
-  #screen-howto, #screen-skins, #screen-leaderboard {
-    overflow-y: auto !important; padding: 8px !important; justify-content: flex-start !important;
-  }
 }
 @media (min-width: 481px) and (max-width: 599px) {
   #scanlines { display: none; }
@@ -417,9 +468,13 @@ html, body {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
-@media (max-width: 480px) {
-  #scores { gap: 16px; padding: max(8px, env(safe-area-inset-top, 8px)) 16px 8px; }
-  :root { --hud-h: 48px; }
+@media (orientation: landscape) and (max-height: 500px) {
+  #scores { gap: 12px !important; padding: max(4px, env(safe-area-inset-top, 4px)) 20px 4px !important; }
+  .score-val { font-size: clamp(22px, 6vw, 32px) !important; }
+  #game-timer { font-size: clamp(16px, 4vw, 22px) !important; }
+  .score-label { font-size: 7px !important; }
+  #hud-skin-p0, #hud-skin-p1 { width: 22px !important; height: 22px !important; }
+  #opponent-label { font-size: 8px !important; top: calc(var(--hud-h, 46px) + 2px) !important; }
 }
 #game-timer {
   font-family:'Share Tech Mono', monospace;
@@ -465,19 +520,24 @@ html, body {
   #mobile-controls {
     flex-direction: column;
     width: auto; height: auto;
-    bottom: 50%; right: 10px; left: auto;
+    bottom: 50%; right: 8px; left: auto;
     transform: translateY(50%);
-    gap: 12px;
-    padding: 12px 8px;
-    background: rgba(0,4,8,0.85);
-    border-radius: 18px;
+    gap: 10px;
+    padding: 10px 6px;
+    background: rgba(0,4,8,0.88);
+    border-radius: 16px;
     border: 1px solid rgba(255,255,255,0.07);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
+    z-index: 62;
   }
   .ctrl-btn {
-    width: 68px !important; height: 68px !important;
-    font-size: 26px !important;
+    width: 60px !important; height: 60px !important;
+    font-size: 22px !important;
+  }
+  #swipe-zone {
+    right: 80px !important;
+    width: calc(100% - 80px) !important;
   }
 }
 /* Overlay portrait */
@@ -528,6 +588,14 @@ html, body {
   bottom:max(clamp(96px,17vw,130px), calc(clamp(96px,17vw,130px) + env(safe-area-inset-bottom, 0px)));
   width:100%;
   z-index:55; display:none;
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  #swipe-zone {
+    bottom: 0 !important;
+    right: 76px !important;
+    width: calc(100% - 76px) !important;
+    left: 0 !important;
+  }
 }
 
 /* ── MATH OVERLAY ── */
@@ -897,10 +965,11 @@ html, body {
 .map-roulette-item.active { border-color:var(--gold); box-shadow:0 0 20px rgba(255,204,0,0.4); }
 .map-roulette-item.active img { filter: brightness(1) saturate(1.2); }
 .map-roulette-item.active .map-label { color:var(--gold); }
-#map-chosen-display { font-size:clamp(20px,6vw,32px); font-weight:900; letter-spacing:4px; color:var(--gold); text-shadow:0 0 30px rgba(255,204,0,0.7); opacity:0; transform:scale(0.8); transition: opacity .4s, transform .4s; min-height:40px; }
+#map-chosen-display { font-size:clamp(16px,4vw,26px); font-weight:900; letter-spacing:3px; color:var(--gold); text-shadow:0 0 30px rgba(255,204,0,0.7); opacity:0; transform:scale(0.8); transition: opacity .4s, transform .4s; min-height:40px; text-align:center; }
 #map-chosen-display.show { opacity:1; transform:scale(1); }
 
-/* ── SCROLLBARS ── */
+/* ── SCORE VAL INSIDE FLEX WRAPPER ── */
+#s0 .score-val, #s1 .score-val { display: inline-block; }
 #screen-howto::-webkit-scrollbar, #screen-skins::-webkit-scrollbar, #screen-leaderboard::-webkit-scrollbar, #screen-win::-webkit-scrollbar { width: 4px; }
 #screen-howto::-webkit-scrollbar-track, #screen-skins::-webkit-scrollbar-track, #screen-leaderboard::-webkit-scrollbar-track, #screen-win::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
 #screen-howto::-webkit-scrollbar-thumb, #screen-skins::-webkit-scrollbar-thumb, #screen-leaderboard::-webkit-scrollbar-thumb, #screen-win::-webkit-scrollbar-thumb { background: rgba(0,238,255,0.2); border-radius: 2px; }
@@ -1017,7 +1086,10 @@ html, body {
   <div id="scores">
     <div class="score-block" id="s0">
       <div class="score-label" id="label0">P1</div>
-      <div class="score-val">0</div>
+      <div style="display:flex;align-items:center;gap:6px;justify-content:center;">
+        <canvas id="hud-skin-p0" width="28" height="28" style="border-radius:6px;opacity:0.85;flex-shrink:0;"></canvas>
+        <div class="score-val">0</div>
+      </div>
     </div>
     <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
       <div id="game-timer">3:00</div>
@@ -1025,7 +1097,10 @@ html, body {
     </div>
     <div class="score-block" id="s1">
       <div class="score-label" id="label1">P2</div>
-      <div class="score-val">0</div>
+      <div style="display:flex;align-items:center;gap:6px;justify-content:center;">
+        <div class="score-val">0</div>
+        <canvas id="hud-skin-p1" width="28" height="28" style="border-radius:6px;opacity:0.85;flex-shrink:0;"></canvas>
+      </div>
     </div>
   </div>
 </div>
@@ -1213,18 +1288,40 @@ function initThree() {
 // Calculate FOV so the 24-unit wide arena always fits in the viewport
 function _calcFOV() {
   const aspect = window.innerWidth / window.innerHeight;
-  // Câmera em Y=9. Arena: X=+-9 (18u wide), Z=+-4.2 (8.4u deep).
-  // Calculamos o FOV vertical necessário para ver X=+-10 (com margem) na largura da tela.
-  const h = 9;
-  const halfFovH = Math.atan2(10.5, h); // horizontal: ver X=+-10.5
-  const halfFovV = Math.atan(Math.tan(halfFovH) / aspect);
-  return Math.min(90, Math.max(40, Math.round(halfFovV * 2 * 180 / Math.PI)));
+  const h = 9; // camera height
+
+  if (aspect >= 1) {
+    // Landscape: arena X=±9 (18u wide) must fit horizontally.
+    // halfFovH = atan(10.5/h), convert to vertical fov
+    const halfFovH = Math.atan2(10.5, h);
+    const halfFovV = Math.atan(Math.tan(halfFovH) / aspect);
+    return Math.min(90, Math.max(38, halfFovV * 2 * 180 / Math.PI));
+  } else {
+    // Portrait: arena Z=±4.2 (8.4u deep) must fit vertically
+    const halfFovV = Math.atan2(5.5, h);
+    return Math.min(90, Math.max(38, halfFovV * 2 * 180 / Math.PI));
+  }
 }
 
 function _positionCamera() {
   threeCamera.position.set(0, 9, 0);
   threeCamera.up.set(0, 0, -1);
   threeCamera.lookAt(0, 0, 0);
+}
+
+function _getHUDOffset() {
+  // In landscape mobile, shift the camera look-at to account for HUD at top
+  // and mobile controls at bottom, so the arena is centered in the playable area
+  const isLandscape = window.innerWidth > window.innerHeight;
+  const isMobileView = window.innerWidth <= 1024 && (navigator.maxTouchPoints > 0 || 'ontouchstart' in window);
+  if (!isLandscape || !isMobileView) return 0;
+  const hudH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hud-h')) || 46;
+  const ctrlH = 76; // approx control button height in landscape
+  const totalH = window.innerHeight;
+  // Shift look-at point in Z to center between HUD and controls
+  const offsetPx = (hudH - ctrlH) / 2;
+  const offsetFrac = offsetPx / totalH;
+  return offsetFrac * 8.4; // 8.4 = arena depth in Three units
 }
 
 function onThreeResize() {
@@ -1234,7 +1331,9 @@ function onThreeResize() {
   threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_MOBILE ? 1.5 : 2));
   threeRenderer.setSize(window.innerWidth, window.innerHeight);
   _positionCamera();
-  BASE_CAM.x = 0; BASE_CAM.y = 9; BASE_CAM.z = 0;
+  const zo = _getHUDOffset();
+  BASE_CAM.x = 0; BASE_CAM.y = 9; BASE_CAM.z = zo;
+  threeCamera.lookAt(0, 0, zo);
 }
 
 function buildLighting() {
@@ -1750,6 +1849,16 @@ function buildPaddlesAndBall() {
   threeBall.position.set(0, 0.3, 0);
   threeBall.scale.setScalar(1.6); // bigger for top-down visibility
   threeScene.add(threeBall);
+
+  // Update HUD skin previews
+  updateHUDSkins();
+}
+
+function updateHUDSkins() {
+  const c0 = document.getElementById('hud-skin-p0');
+  const c1 = document.getElementById('hud-skin-p1');
+  if (c0) drawSkinPreview2D(c0, 'paddle', selectedPaddleSkin, false);
+  if (c1) drawSkinPreview2D(c1, 'paddle', selectedPaddleSkin, true);
 }
 
 // ── COORDINATE MAPPING ───────────────────────────────────────────────────────
@@ -1879,7 +1988,7 @@ function threeLoop() {
     threeCamera.position.y += (BASE_CAM.y - threeCamera.position.y) * 0.1;
     threeCamera.position.z += (BASE_CAM.z - threeCamera.position.z) * 0.1;
   }
-  threeCamera.lookAt(0, 0, 0);
+  threeCamera.lookAt(BASE_CAM.x, 0, BASE_CAM.z);
 
   if (gameRunning3D) {
     // Sync paddle positions
@@ -1948,6 +2057,12 @@ function threeLoop() {
 
 // Initialize Three.js
 initThree();
+// Apply HUD offset now that DOM is ready
+(function() {
+  const zo = _getHUDOffset();
+  BASE_CAM.z = zo;
+  threeCamera.lookAt(0, 0, zo);
+})();
 initParticlePool();
 if (!IS_MOBILE) initTrail();
 
@@ -2695,7 +2810,7 @@ function spinMapRoulette() {
         track.querySelectorAll('.map-roulette-item').forEach((el,i) => el.classList.toggle('active', i === landingIdx));
         title.textContent = '✅ MAPA ESCOLHIDO!';
         status.textContent = `${winner.emoji} ${winner.label}`; status.classList.add('chosen');
-        chosen.textContent = winner.emoji; chosen.classList.add('show');
+        chosen.textContent = `${winner.emoji} ${winner.label}`; chosen.classList.add('show');
         SFX.rouletteResult?.();
         applyMap(winner.id);
         setTimeout(() => {
@@ -2836,6 +2951,7 @@ socket.on('match_found', data => {
 
   gameRunning3D = true;
   activateSwipeZone();
+  updateHUDSkins();
   spinMapRoulette().then(() => startCountdown());
 });
 
@@ -2873,6 +2989,7 @@ function startAIGame() {
 
   gameRunning3D = true;
   activateSwipeZone();
+  updateHUDSkins();
 
   spinMapRoulette().then(() => {
     startCountdown();
@@ -2888,7 +3005,7 @@ function startAIGame() {
       const now = Date.now(), dt = (now - lastTick) / 1000;
       lastTick = now;
 
-      if (!aiMathActive) {
+      if (!aiMathActive && !gamePaused) {
         timeLeft -= dt;
         if (timeLeft <= 0) { endAIGame(); return; }
         const t = Math.max(0, Math.floor(timeLeft));
@@ -2899,13 +3016,16 @@ function startAIGame() {
       }
 
       const b = ballState;
-      b.x += b.vx; b.y += b.vy;
+      if (!gamePaused) {
+        b.x += b.vx; b.y += b.vy;
+      }
       const prevVy = b.vy;
       if (b.y < -1 + BALL_R_CLIENT) { b.y = -1 + BALL_R_CLIENT; b.vy = Math.abs(b.vy); SFX.wallHit(); }
       if (b.y >  1 - BALL_R_CLIENT) { b.y =  1 - BALL_R_CLIENT; b.vy = -Math.abs(b.vy); SFX.wallHit(); }
 
       window._ballX = b.x; window._ballY = b.y;
 
+      if (!gamePaused) {
       // Player paddle hit
       if (b.x < -0.86 + BALL_R_CLIENT && b.vx < 0) {
         if (Math.abs(b.y - myPaddleY) < (PADDLE_H_CLIENT * paddleScaleP0) + BALL_R_CLIENT) {
@@ -2914,14 +3034,15 @@ function startAIGame() {
           const angle = relY * Math.PI * 0.38;
           b.vx = Math.abs(Math.cos(angle)) * BALL_SPEED_CLIENT;
           b.vy = Math.sin(angle) * BALL_SPEED_CLIENT;
-          // Clamp speed to prevent accumulation
+          // Normalize speed to exactly BALL_SPEED_CLIENT
           const spd = Math.hypot(b.vx, b.vy);
-          if (spd > BALL_SPEED_CLIENT * 1.5) { b.vx *= BALL_SPEED_CLIENT / spd; b.vy *= BALL_SPEED_CLIENT / spd; }
+          b.vx = (b.vx / spd) * BALL_SPEED_CLIENT;
+          b.vy = (b.vy / spd) * BALL_SPEED_CLIENT;
           paddleHitGlow[0] = 1.0;
           spawnParticles3D(gameToThreeX(b.x), gameToThreeZ(b.y), 0x00eeff, IS_MOBILE ? 8 : 16);
           SFX.paddleHit();
           aiRally++;
-          if (aiRally % 3 === 0 && !aiMathActive) { aiMathActive = true; triggerAIMath(() => { aiMathActive = false; }); }
+          if (aiRally % 3 === 0 && !aiMathActive && Math.abs(b.x) < 0.9) { aiMathActive = true; triggerAIMath(() => { aiMathActive = false; }); }
         }
       }
 
@@ -2933,9 +3054,10 @@ function startAIGame() {
           const angle = relY * Math.PI * 0.38;
           b.vx = -Math.abs(Math.cos(angle)) * BALL_SPEED_CLIENT;
           b.vy = Math.sin(angle) * BALL_SPEED_CLIENT;
-          // Clamp speed
+          // Normalize speed to exactly BALL_SPEED_CLIENT
           const spd = Math.hypot(b.vx, b.vy);
-          if (spd > BALL_SPEED_CLIENT * 1.5) { b.vx *= BALL_SPEED_CLIENT / spd; b.vy *= BALL_SPEED_CLIENT / spd; }
+          b.vx = (b.vx / spd) * BALL_SPEED_CLIENT;
+          b.vy = (b.vy / spd) * BALL_SPEED_CLIENT;
           paddleHitGlow[1] = 1.0;
           spawnParticles3D(gameToThreeX(b.x), gameToThreeZ(b.y), 0xff4466, IS_MOBILE ? 8 : 16);
           SFX.paddleHit();
@@ -2947,6 +3069,7 @@ function startAIGame() {
       oppPaddleY += (aiTarget - oppPaddleY) * aiDifficulty;
       oppPaddleY = Math.max(-1+PADDLE_H_CLIENT, Math.min(1-PADDLE_H_CLIENT, oppPaddleY));
       window._oppPaddleY = oppPaddleY;
+      } // end !gamePaused
 
       if (b.x < -1.05) { aiPoint(1); }
       if (b.x >  1.05) { aiPoint(0); }
@@ -3115,7 +3238,7 @@ function goMenu() {
   // Reset arena visuals
   applyMap('arena');
   // Reset Three.js objects
-  buildPaddlesAndBall(); // rebuilds with correct rotation/scale
+  buildPaddlesAndBall(); // rebuilds with correct rotation/scale (also calls updateHUDSkins inside)
 }
 
 // (initThree already calls buildPaddlesAndBall internally)
@@ -3126,8 +3249,11 @@ function goMenu() {
   if (!ov) return;
   function check() {
     const touch = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
-    if (!touch) return;
-    ov.classList.toggle('show', window.innerHeight > window.innerWidth);
+    if (!touch) { ov.classList.remove('show'); return; }
+    // Only show rotate overlay on phones (small screens), not tablets
+    const isSmallScreen = Math.min(window.innerWidth, window.innerHeight) < 600;
+    const isPortrait = window.innerHeight > window.innerWidth;
+    ov.classList.toggle('show', isPortrait && isSmallScreen);
   }
   window.addEventListener('resize', check);
   window.addEventListener('orientationchange', () => setTimeout(check, 300));
