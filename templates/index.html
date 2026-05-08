@@ -1938,17 +1938,17 @@ function spawnParticles3D(tx, tz, color, count = 12) {
 }
 
 function updateParticles3D() {
-  particlePool3D.forEach(p => {
-    if (p.life <= 0) { p.mesh.visible = false; return; }
+  for (let i = 0; i < particlePool3D.length; i++) {
+    const p = particlePool3D[i];
+    if (p.life <= 0) { if (p.mesh.visible) p.mesh.visible = false; continue; }
     p.life -= 0.04;
     p.mesh.position.x += p.vx;
     p.mesh.position.y += p.vy;
     p.mesh.position.z += p.vz;
-    p.vy -= 0.003; // gravity
+    p.vy -= 0.003;
     p.mesh.material.opacity = p.life * 0.9;
-    const s = p.life * 0.8;
-    p.mesh.scale.setScalar(Math.max(0.01, s));
-  });
+    p.mesh.scale.setScalar(Math.max(0.01, p.life * 0.8));
+  }
 }
 
 // ── PADDLE SCALE ANIMATIONS ──────────────────────────────────────────────────
@@ -1971,13 +1971,13 @@ function threeLoop(now) {
   _lastRAFTime = now;
   globalTime += dt;
 
-  // Animate center line pulse
-  if (threeCenterLine) {
+  // Animate center line pulse (throttled — não precisa de 60fps)
+  if (threeCenterLine && (globalTime * 60 | 0) % 3 === 0) {
     threeCenterLine.material.emissiveIntensity = 0.4 + Math.sin(globalTime * 2) * 0.3;
   }
 
-  // Animate wall light intensity gently
-  if (window._threePointL) {
+  // Animate wall light intensity (throttled)
+  if (window._threePointL && (globalTime * 60 | 0) % 4 === 0) {
     window._threePointL.intensity = 2.5 + Math.sin(globalTime * 1.3) * 0.4;
     window._threePointR.intensity = 2.5 + Math.cos(globalTime * 1.1) * 0.4;
   }
@@ -2004,26 +2004,18 @@ function threeLoop(now) {
       // Qualquer lerp aqui criaria atraso entre input e visual
       window._myPaddleY = myPaddleY;
 
-      // Bola: snap imediato se mudou de direção (evita atravessar paddle visualmente)
+      // Bola: lerp direto até a posição real do servidor (sem dead-reckoning acumulativo)
+      // Dead-reckoning acumulava erro a cada frame e era a principal causa de travamento
       const prevVx = ballState._prevVx || 0;
       const currVx = ballState.vx || 0;
-      const ballAlpha = 1 - Math.pow(1 - 0.90, dt * 60); // ~90% por frame
-      if (prevVx !== 0 && Math.sign(currVx) !== Math.sign(prevVx)) {
-        // Direção inverteu — snap direto para evitar "atravessar" paddle
+      const dirChanged = prevVx !== 0 && Math.sign(currVx) !== Math.sign(prevVx);
+      if (dirChanged) {
+        // Colisão detectada: snap imediato para posição do servidor
         window._ballX = _ballTargetX;
         window._ballY = _ballTargetY;
-        _ballTargetX = ballState.x || 0; // reseta target também para não acumular erro
-        _ballTargetY = ballState.y || 0;
       } else {
-        // Dead-reckoning: avança o alvo baseado na velocidade conhecida (suaviza lag de rede)
-        // Clamp da contribuição de velocidade para evitar overshooting em lag spike
-        const drVx = Math.max(-0.04, Math.min(0.04, ballState.vx || 0));
-        const drVy = Math.max(-0.04, Math.min(0.04, ballState.vy || 0));
-        _ballTargetX += drVx * dt * 60 * 0.5;
-        _ballTargetY += drVy * dt * 60 * 0.5;
-        // Se target saiu completamente da arena, descarta dead-reckoning
-        if (_ballTargetX < -1.2 || _ballTargetX > 1.2) _ballTargetX = ballState.x || 0;
-        if (_ballTargetY < -1.1 || _ballTargetY > 1.1) _ballTargetY = ballState.y || 0;
+        // Lerp suave: 85% por frame (~60fps) — suaviza jitter sem acumular erro
+        const ballAlpha = 1 - Math.pow(1 - 0.85, dt * 60);
         window._ballX += (_ballTargetX - window._ballX) * ballAlpha;
         window._ballY += (_ballTargetY - window._ballY) * ballAlpha;
       }
@@ -2555,13 +2547,14 @@ socket.on('game_state', data => {
   const prevVx = ballState.vx || 0;
   const dirChanged = prevVx !== 0 && Math.sign(b.vx) !== Math.sign(prevVx);
 
+  // Sempre atualiza o target com a posição real do servidor — sem acúmulo
   _ballTargetX = b.x;
   _ballTargetY = b.y;
 
+  // Snap imediato em colisão ou teleporte grande
   const distX = Math.abs(_ballTargetX - window._ballX);
   const distY = Math.abs(_ballTargetY - window._ballY);
-  if (dirChanged || distX > 0.12 || distY > 0.12 ||
-      (prevVx === 0 && (Math.abs(b.vx) > 0 || Math.abs(b.vy) > 0))) {
+  if (dirChanged || distX > 0.15 || distY > 0.15) {
     window._ballX = _ballTargetX;
     window._ballY = _ballTargetY;
   }
@@ -2623,8 +2616,8 @@ socket.on('score_update', data => {
     const isMe = data.buff_player === myIdx;
     showEffectToast(isMe ? '⚡ CORRETO! Girando roleta!' : '⚡ Inimigo acertou — buff vindo!');
     // Não executa o bloco de gol abaixo (scorer pode vir junto mas é ignorado aqui)
-  } else if (data.scorer !== undefined && data.scorer >= 0 && !data.math_penalty && !data.math_correct_buff) {
-    // Gol real — sem relação com matemática
+  } else if (data.scorer !== undefined && data.scorer >= 0 && !data.math_penalty && !data.math_correct_buff && !_isMathWindow()) {
+    // Gol real — sem relação com matemática e fora da janela pós-resposta
     armSwing = 8;
     triggerGoalFlash(data.scorer);
     SFX.goal(data.scorer === myIdx);
@@ -2737,6 +2730,9 @@ socket.on('opponent_left', () => {
 let mathTimerInterval = null;
 let mathTimerSec      = 8;
 let myTurnToAnswer    = false;
+// Bloqueia efeitos de gol por 2.5s após qualquer resolução de matemática
+let _mathResolvedAt   = 0;
+function _isMathWindow() { return (Date.now() - _mathResolvedAt) < 2500; }
 
 function showMath(data) {
   myTurnToAnswer = true;
@@ -2793,6 +2789,7 @@ function showBigFeedback(type, text) {
 
 function resolvemath(data) {
   clearInterval(mathTimerInterval);
+  _mathResolvedAt = Date.now(); // marca janela de proteção
   const myMbsEl = document.getElementById(`mbs-p${myIdx}`);
   if (myMbsEl) myMbsEl.classList.add('answered');
   const fb   = document.getElementById('math-fb');
@@ -2968,41 +2965,31 @@ function _getMapBg() {
   return _mapBgEl;
 }
 
-function applyMap(mapId) {
-  const map = MAPS.find(m => m.id === mapId);
-  const bg  = _getMapBg();
-
-  if (map && map.url) {
+function applyMapDirect(map) {
+  if (!map) return;
+  const bg = _getMapBg();
+  if (map.url) {
     bg.style.backgroundImage = `url('${map.url}')`;
     bg.style.opacity = '0.55';
-    // Torna o chão 3D semi-transparente para a imagem aparecer atrás
-    if (threeFloor) {
-      threeFloor.material.transparent = true;
-      threeFloor.material.opacity = 0.18;
-    }
+    if (threeFloor) { threeFloor.material.transparent = true; threeFloor.material.opacity = 0.18; }
   } else {
     bg.style.opacity = '0';
     bg.style.backgroundImage = 'none';
-    // Restaura o chão opaco
-    if (threeFloor) {
-      threeFloor.material.transparent = false;
-      threeFloor.material.opacity = 1.0;
-    }
+    if (threeFloor) { threeFloor.material.transparent = false; threeFloor.material.opacity = 1.0; }
   }
-
   if (!threeScene) return;
-  // Deriva tema pelo id (funciona tanto para fallbacks quanto arquivos do servidor)
-  const id = (mapId || '').toLowerCase();
+  const id = (map.id || '').toLowerCase();
   if (id.includes('space') || id.includes('espa') || id.includes('cosmos')) {
-    threeScene.fog.color.setHex(0x000010);
-    threeFloor.material.color.setHex(0x000820);
+    threeScene.fog.color.setHex(0x000010); threeFloor.material.color.setHex(0x000820);
   } else if (id.includes('retro') || id.includes('neon') || id.includes('pixel')) {
-    threeScene.fog.color.setHex(0x100005);
-    threeFloor.material.color.setHex(0x0a0005);
+    threeScene.fog.color.setHex(0x100005); threeFloor.material.color.setHex(0x0a0005);
   } else {
-    threeScene.fog.color.setHex(0x000408);
-    threeFloor.material.color.setHex(0x010812);
+    threeScene.fog.color.setHex(0x000408); threeFloor.material.color.setHex(0x010812);
   }
+}
+
+function applyMap(mapId) {
+  applyMapDirect(MAPS.find(m => m.id === mapId) || { id: mapId, url: null, emoji: '🏟' });
 }
 
 function clearMapBg() {
@@ -3023,67 +3010,95 @@ function spinMapRoulette() {
     const status  = document.getElementById('map-roulette-status');
     const chosen  = document.getElementById('map-chosen-display');
 
-    // Aguarda o fetch de /maps terminar antes de sortear
     (async () => {
       if (!_mapsReady) {
         title.textContent = '🗺 CARREGANDO MAPAS...';
         overlay.classList.add('show');
         await _mapsReadyPromise;
       }
-    const ITEM_W  = 152;
-    const winnerIdx = Math.floor(Math.random() * MAPS.length);
-    const winner = MAPS[winnerIdx];
-    const REPS = 5;
-    const items = [];
-    for (let r = 0; r < REPS; r++) MAPS.forEach(m => items.push(m));
-    const landingIdx = Math.floor(REPS/2) * MAPS.length + winnerIdx;
 
-    track.innerHTML = '';
-    items.forEach(m => {
-      const div = document.createElement('div');
-      div.className = 'map-roulette-item';
-      // Usa thumbnail da imagem se disponível, senão emoji
-      const thumb = m.url
-        ? `<div style="height:88px;background:url('${m.url}') center/cover no-repeat;border-radius:4px 4px 0 0;"></div>`
-        : `<div style="height:88px;display:flex;align-items:center;justify-content:center;font-size:40px;background:linear-gradient(135deg,rgba(0,238,255,0.05),rgba(0,0,0,0.8));">${m.emoji}</div>`;
-      div.innerHTML = `${thumb}<div class="map-label">${m.label}</div>`;
-      track.appendChild(div);
-    });
+      const ITEM_W    = 152;
+      const ITEM_GAP  = 6; // margin compensada
+      const STRIDE    = ITEM_W + ITEM_GAP;
 
-    title.textContent = '🗺 ESCOLHENDO MAPA...';
-    status.textContent = 'SORTEANDO...'; status.classList.remove('chosen');
-    chosen.classList.remove('show'); chosen.textContent = '';
-    track.style.transition = 'none';
-    const centerOffset = window.innerWidth / 2 - ITEM_W / 2 - 6;
-    track.style.transform = `translateX(${centerOffset}px)`;
-    overlay.classList.add('show');
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      const finalX = centerOffset - landingIdx * ITEM_W;
+      // Sorteia o vencedor ANTES de montar a faixa — captura referência estável
+      const winnerIdx = Math.floor(Math.random() * MAPS.length);
+      const winner    = MAPS[winnerIdx]; // referência IMUTÁVEL
+
+      const REPS = 5;
+      const items = [];
+      for (let r = 0; r < REPS; r++) MAPS.forEach(m => items.push({ ...m }));
+      // Landing: posiciona o vencedor exatamente no centro da faixa (rep 2 de 5)
+      const landingIdx = Math.floor(REPS / 2) * MAPS.length + winnerIdx;
+
+      track.innerHTML = '';
+      items.forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'map-roulette-item';
+        const thumb = m.url
+          ? `<div style="height:88px;background:url('${m.url}') center/cover no-repeat;border-radius:4px 4px 0 0;"></div>`
+          : `<div style="height:88px;display:flex;align-items:center;justify-content:center;font-size:40px;background:linear-gradient(135deg,rgba(0,238,255,0.05),rgba(0,0,0,0.8));">${m.emoji}</div>`;
+        div.innerHTML = `${thumb}<div class="map-label">${m.label}</div>`;
+        track.appendChild(div);
+      });
+
+      const allItems = track.querySelectorAll('.map-roulette-item');
+
+      title.textContent = '🗺 ESCOLHENDO MAPA...';
+      status.textContent = 'SORTEANDO...'; status.classList.remove('chosen');
+      chosen.classList.remove('show'); chosen.textContent = '';
+      overlay.classList.add('show');
+
+      // Posição inicial: centraliza no item 0
+      const centerOffset = window.innerWidth / 2 - ITEM_W / 2;
+      track.style.transition = 'none';
+      track.style.transform  = `translateX(${centerOffset}px)`;
+
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+      // Posição final: centraliza no landingIdx
+      const finalX = centerOffset - landingIdx * STRIDE;
       track.style.transition = `transform 3.2s cubic-bezier(0.15, 0.0, 0.1, 1.0)`;
       track.style.transform  = `translateX(${finalX}px)`;
-      const hlInterval = setInterval(() => {
-        const cur = parseFloat(track.style.transform.replace('translateX(','').replace('px)','') || centerOffset);
-        const scrolled = centerOffset - cur;
-        const activeI  = Math.round(Math.max(0, scrolled) / ITEM_W);
-        track.querySelectorAll('.map-roulette-item').forEach((el,i) => el.classList.toggle('active', i === activeI));
-      }, 60);
+
+      // Highlight: usa posição calculada geometricamente (não lê transform do DOM)
+      let _animStart = null;
+      const _animDuration = 3200;
+      function _highlightFrame(ts) {
+        if (!_animStart) _animStart = ts;
+        const elapsed  = Math.min(ts - _animStart, _animDuration);
+        // Ease cubic-bezier(0.15,0,0.1,1): aproximação
+        const t = elapsed / _animDuration;
+        const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        const currentX = centerOffset + (finalX - centerOffset) * eased;
+        const scrolled = centerOffset - currentX;
+        const activeI  = Math.round(Math.max(0, scrolled) / STRIDE);
+        allItems.forEach((el, i) => el.classList.toggle('active', i === activeI));
+        if (elapsed < _animDuration) requestAnimationFrame(_highlightFrame);
+      }
+      requestAnimationFrame(_highlightFrame);
+
+      // Após animação: confirma o item correto e aplica mapa
       setTimeout(() => {
-        clearInterval(hlInterval);
-        track.querySelectorAll('.map-roulette-item').forEach((el,i) => el.classList.toggle('active', i === landingIdx));
+        allItems.forEach((el, i) => el.classList.toggle('active', i === landingIdx));
         title.textContent = '✅ MAPA ESCOLHIDO!';
         const winLabel = winner.url ? `🗺 ${winner.label}` : `${winner.emoji} ${winner.label}`;
         status.textContent = winLabel; status.classList.add('chosen');
         chosen.textContent = winLabel; chosen.classList.add('show');
         SFX.rouletteResult?.();
-        applyMap(winner.id);
+
+        // Aplica o mapa usando o objeto winner capturado — sem re-busca por id
+        applyMapDirect(winner);
+
         setTimeout(() => {
-          overlay.classList.remove('show'); status.classList.remove('chosen'); chosen.classList.remove('show');
+          overlay.classList.remove('show');
+          status.classList.remove('chosen');
+          chosen.classList.remove('show');
           gamePaused = false;
           resolve(winner);
         }, 1800);
       }, 3300);
-    }));
-    })(); // fecha async IIFE
+    })();
   });
 }
 
