@@ -1958,7 +1958,6 @@ let paddleHitGlow = [0, 0]; // flash intensity
 let ballRotSpeed = { x: 0.03, y: 0.05, z: 0.02 };
 
 // ── CAMERA CINEMATIC ─────────────────────────────────────────────────────────
-let camShake = 0;
 let BASE_CAM = { x: 0, y: 9, z: 0 };
 
 // ── MAIN RENDER LOOP ─────────────────────────────────────────────────────────
@@ -1981,16 +1980,10 @@ function threeLoop(now) {
     window._threePointR.intensity = 2.5 + Math.cos(globalTime * 1.1) * 0.4;
   }
 
-  // Camera shake on goal
-  if (camShake > 0) {
-    threeCamera.position.x = BASE_CAM.x + (Math.random() - 0.5) * camShake * 0.5;
-    threeCamera.position.z = BASE_CAM.z + (Math.random() - 0.5) * camShake * 0.5;
-    camShake -= 0.06;
-  } else {
-    threeCamera.position.x += (BASE_CAM.x - threeCamera.position.x) * 0.1;
-    threeCamera.position.y += (BASE_CAM.y - threeCamera.position.y) * 0.1;
-    threeCamera.position.z += (BASE_CAM.z - threeCamera.position.z) * 0.1;
-  }
+  // Camera sempre suave no centro
+  threeCamera.position.x += (BASE_CAM.x - threeCamera.position.x) * 0.1;
+  threeCamera.position.y += (BASE_CAM.y - threeCamera.position.y) * 0.1;
+  threeCamera.position.z += (BASE_CAM.z - threeCamera.position.z) * 0.1;
   threeCamera.lookAt(BASE_CAM.x, 0, BASE_CAM.z);
 
   if (gameRunning3D) {
@@ -2010,6 +2003,9 @@ function threeLoop(now) {
         window._ballX = _ballTargetX;
         window._ballY = _ballTargetY;
       } else {
+        // Dead-reckoning: avança o alvo baseado na velocidade conhecida (suaviza lag de rede)
+        _ballTargetX += (ballState.vx || 0) * dt * 60 * 0.5;
+        _ballTargetY += (ballState.vy || 0) * dt * 60 * 0.5;
         window._ballX += (_ballTargetX - window._ballX) * ballAlpha;
         window._ballY += (_ballTargetY - window._ballY) * ballAlpha;
       }
@@ -2479,7 +2475,7 @@ function applyEffect(effectId, isMe) {
   }
 }
 
-socket.on('effect_reverse', data => { if (data.player_idx === myIdx) reverseControls = false; else if (data.player_idx === -1) reverseControls = false; });
+socket.on('effect_reverse', data => { if (data.player_idx === myIdx || data.player_idx === -1) reverseControls = false; });
 
 // ── GAME STATE SYNC ────────────────────────────────────────────────────────────
 // Interpolation targets for smooth rendering despite network jitter
@@ -2525,8 +2521,11 @@ socket.on('game_state', data => {
 
 socket.on('score_update', data => {
   scores = data.scores;
-  document.querySelector('#s0 .score-val').textContent = scores[0];
-  document.querySelector('#s1 .score-val').textContent = scores[1];
+  // Atualiza placar no HUD se visível
+  const s0el = document.querySelector('#s0 .score-val');
+  const s1el = document.querySelector('#s1 .score-val');
+  if (s0el) s0el.textContent = scores[0];
+  if (s1el) s1el.textContent = scores[1];
 
   // Snap bola ao centro no novo saque — evita fantasma de interpolação
   _ballTargetX = 0; _ballTargetY = 0;
@@ -2564,7 +2563,6 @@ socket.on('score_update', data => {
     armSwing = 8;
     triggerGoalFlash(data.scorer);
     SFX.goal(data.scorer === myIdx);
-    camShake = 0.8; // 3D camera shake!
     // 3D particles at goal position
     spawnParticles3D(
       data.scorer === 0 ? -9 : 9,
@@ -2635,7 +2633,12 @@ function showReadyFlash() {
 socket.on('math_question', data => { showMath(data); });
 socket.on('math_result',   data => { resolvemath(data); });
 socket.on('game_over',     data => { hide('hud'); hide('opponent-label'); hide('mobile-controls'); showWin(data); });
-socket.on('leaderboard_update', data => { buildPodiumWin(data.leaderboard || []); });
+socket.on('leaderboard_update', data => {
+  const winScreen = document.getElementById('screen-win');
+  if (winScreen && !winScreen.classList.contains('hidden')) {
+    buildPodiumWin(data.leaderboard || []);
+  }
+});
 socket.on('opponent_left', ()   => { hide('hud'); hide('opponent-label'); hide('mobile-controls'); hideMathOverlay(); deactivateSwipeZone(); show('screen-disconnected'); });
 
 // ── MATH OVERLAY ──────────────────────────────────────────────────────────────
@@ -2720,12 +2723,14 @@ function resolvemath(data) {
 function hideMathOverlay() {
   clearInterval(mathTimerInterval);
   document.getElementById('math-overlay').classList.remove('show');
-  gamePaused = false;
-  // Snap bola ao target atual para evitar teletransporte após pausa
-  if (!aiMode) {
-    window._ballX = _ballTargetX;
-    window._ballY = _ballTargetY;
-    ballState._prevVx = ballState.vx; // evita falso snap de colisão no próximo frame
+  // Só despausa se o jogo ainda estiver rodando (não reativa após game_over)
+  if (gameRunning3D) {
+    gamePaused = false;
+    if (!aiMode) {
+      window._ballX = _ballTargetX;
+      window._ballY = _ballTargetY;
+      ballState._prevVx = ballState.vx;
+    }
   }
 }
 
@@ -2765,6 +2770,7 @@ function spawnWinStars() {
 
 // ── WIN / PODIUM ──────────────────────────────────────────────────────────────
 function showWin(data) {
+  if (document.getElementById('screen-win') && !document.getElementById('screen-win').classList.contains('hidden')) return; // já exibindo
   gameRunning3D = false;
   startConfetti(); spawnWinStars();
   const wsd0=document.getElementById('wsd-s0'),wsd1=document.getElementById('wsd-s1'),wsdn0=document.getElementById('wsd-n0'),wsdn1=document.getElementById('wsd-n1');
@@ -2782,6 +2788,12 @@ function showWin(data) {
 function buildPodiumWin(lb) {
   const podium=document.getElementById('podium'); podium.innerHTML='';
   const rest=document.getElementById('leaderboard-rest'); rest.innerHTML='';
+
+  if (!lb || lb.length === 0) {
+    podium.innerHTML = '<div style="color:#333;font-family:\'Share Tech Mono\',monospace;font-size:10px;letter-spacing:3px;grid-column:1/-1;text-align:center;padding:20px 0;">⏳ CARREGANDO PÓDIO...</div>';
+    return;
+  }
+
   const top3=lb.slice(0,3); const order=[1,0,2]; const rankClass=['rank1','rank2','rank3'];
   order.forEach(i => {
     if(!top3[i]) return;
@@ -3237,7 +3249,6 @@ function aiPoint(scorerIdx) {
   document.querySelector(`#s${scorerIdx} .score-val`).textContent = scores[scorerIdx];
   SFX.goal(scorerIdx === 0);
   triggerGoalFlash(scorerIdx);
-  camShake = 0.9;
   spawnParticles3D(scorerIdx === 0 ? -9 : 9, 0, scorerIdx === 0 ? 0x00eeff : 0xff4466, IS_MOBILE ? 12 : 25);
   const el = document.querySelector(`#s${scorerIdx} .score-val`);
   if(el) { el.style.transform='scale(1.5)'; setTimeout(()=>el.style.transform='scale(1)',350); }
