@@ -2650,6 +2650,15 @@ socket.on('leaderboard_update', data => {
     buildPodiumWin(data.leaderboard || []);
   }
 });
+
+// Busca leaderboard via HTTP como fallback caso o socket falhe
+async function fetchAndBuildPodium() {
+  try {
+    const res = await fetch('/leaderboard');
+    const lb  = await res.json();
+    if (lb && lb.length > 0) buildPodiumWin(lb);
+  } catch(e) {}
+}
 socket.on('opponent_left', ()   => { hide('hud'); hide('opponent-label'); hide('mobile-controls'); hideMathOverlay(); deactivateSwipeZone(); show('screen-disconnected'); });
 
 // ── MATH OVERLAY ──────────────────────────────────────────────────────────────
@@ -2797,6 +2806,10 @@ function showWin(data) {
   document.getElementById('win-turma').textContent=(data.winner_turma||myTurma||'').toUpperCase();
   buildPodiumWin(data.leaderboard||[]);
   show('screen-win');
+  // Fallback: se o leaderboard chegou vazio, busca via HTTP após 2s
+  if (!data.leaderboard || data.leaderboard.length === 0) {
+    setTimeout(fetchAndBuildPodium, 2000);
+  }
 }
 
 function buildPodiumWin(lb) {
