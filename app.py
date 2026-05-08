@@ -303,26 +303,37 @@ class GameRoom:
                 return
             self._game_over_sent = True
 
-        # Limpa a sala do dict global para evitar memory leak
-        rooms.pop(self.room_id, None)
-
         winner_sid  = self.sids[winner_idx]
         winner_info = self.players[winner_sid]['info']
+        room_id     = self.room_id
+        player_sids = list(self.sids)
+
+        # Salva vitoria e busca leaderboard ANTES de emitir game_over
+        # para garantir que o podio ja chegue preenchido no cliente
+        db_add_win(winner_info.get('name'), winner_info.get('turma', ''))
+        lb = db_get_leaderboard()
+
+        # Limpa a sala do dict global para evitar memory leak
+        rooms.pop(room_id, None)
 
         socketio.emit('game_over', {
             'winner_idx':   winner_idx,
             'winner_name':  winner_info['name'],
             'winner_turma': winner_info.get('turma', ''),
             'scores':       self.scores[:],
-            'leaderboard':  [],
-        }, room=self.room_id)
+            'leaderboard':  lb,
+        }, room=room_id)
 
-        room_id = self.room_id
-        def save_and_push_leaderboard():
-            db_add_win(winner_info.get('name'), winner_info.get('turma', ''))
-            lb = db_get_leaderboard()
-            socketio.emit('leaderboard_update', {'leaderboard': lb}, room=room_id)
-        threading.Thread(target=save_and_push_leaderboard, daemon=True).start()
+        # Envia leaderboard_update individualmente como garantia extra
+        # (room pode nao funcionar apos o cleanup do dict)
+        def push_leaderboard_direct():
+            time.sleep(0.8)
+            for sid in player_sids:
+                try:
+                    socketio.emit('leaderboard_update', {'leaderboard': lb}, to=sid)
+                except Exception:
+                    pass
+        threading.Thread(target=push_leaderboard_direct, daemon=True).start()
 
     # ── MATEMÁTICA ───────────────────────────────────────────────────────────
 
