@@ -2656,8 +2656,9 @@ async function fetchAndBuildPodium() {
   try {
     const res = await fetch('/leaderboard');
     const lb  = await res.json();
-    if (lb && lb.length > 0) buildPodiumWin(lb);
+    if (lb && lb.length > 0) { buildPodiumWin(lb); return true; }
   } catch(e) {}
+  return false;
 }
 socket.on('opponent_left', ()   => { hide('hud'); hide('opponent-label'); hide('mobile-controls'); hideMathOverlay(); deactivateSwipeZone(); show('screen-disconnected'); });
 
@@ -2806,9 +2807,17 @@ function showWin(data) {
   document.getElementById('win-turma').textContent=(data.winner_turma||myTurma||'').toUpperCase();
   buildPodiumWin(data.leaderboard||[]);
   show('screen-win');
-  // Fallback: se o leaderboard chegou vazio, busca via HTTP após 2s
+  // Fallback HTTP: busca o podio caso socket nao entregue leaderboard_update
+  // Tenta em 2s, 4s e 7s para garantir que o Supabase ja confirmou a escrita
   if (!data.leaderboard || data.leaderboard.length === 0) {
-    setTimeout(fetchAndBuildPodium, 2000);
+    let _attempts = 0;
+    function _retryPodium() {
+      _attempts++;
+      fetchAndBuildPodium().then(filled => {
+        if (!filled && _attempts < 3) setTimeout(_retryPodium, 2000);
+      });
+    }
+    setTimeout(_retryPodium, 2000);
   }
 }
 
