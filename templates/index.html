@@ -2230,6 +2230,8 @@ function threeLoop(now) {
     tickVisualEffects(dt);
     if (aiMode && !gamePaused) updateExtraBalls(dt);
 
+    // ── Interpolação multiplayer (dentro do RAF, delta-time real) ──
+    if (!aiMode && !gamePaused) {
       // Paddle: lerp rápido para responsividade visual
       const paddleAlpha = 1 - Math.pow(1 - 0.92, dt * 60); // ~92% por frame = muito responsivo
       oppPaddleY    += (_oppTargetY  - oppPaddleY)    * paddleAlpha;
