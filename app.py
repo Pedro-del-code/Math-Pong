@@ -4,57 +4,83 @@ import math
 import random
 import threading
 import time
+import sqlite3
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit, join_room, leave_room
-from supabase import create_client, Client
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'mathpong-secret-2024')
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
-# ── SUPABASE ──────────────────────────────────────────────────────────────────
-SUPABASE_URL = os.environ.get('SUPABASE_URL', '')
-SUPABASE_KEY = os.environ.get('SUPABASE_KEY', '')
-supabase: Client = None
-if SUPABASE_URL and SUPABASE_KEY:
-    try:
-        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-        print("[DB] Supabase conectado.")
-    except Exception as e:
-        print(f"[DB] Falha ao conectar Supabase: {e}")
+# ── SQLITE ────────────────────────────────────────────────────────────────────
+DB_PATH = os.environ.get('DB_PATH', '/tmp/mathpong.db')
+_db_lock = threading.Lock()
+
+def _get_conn():
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def _init_db():
+    with _get_conn() as conn:
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS players (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                name      TEXT NOT NULL,
+                turma     TEXT NOT NULL DEFAULT '',
+                wins      INTEGER NOT NULL DEFAULT 0,
+                UNIQUE(name, turma)
+            )
+        ''')
+        conn.commit()
+    print(f'[DB] SQLite pronto em {DB_PATH}')
+
+_init_db()
 
 
 def db_get_or_create_player(name, turma):
-    if not supabase:
-        return {'id': None, 'name': name, 'turma': turma, 'wins': 0}
-    try:
-        res = supabase.rpc('upsert_player', {'p_name': name, 'p_turma': turma}).execute()
-        if res.data:
-            return res.data[0]
-    except Exception as e:
-        print(f'[DB] upsert_player error: {e}')
-    return {'id': None, 'name': name, 'turma': turma, 'wins': 0}
+    turma = turma or ''
+    with _db_lock, _get_conn() as conn:
+        conn.execute(
+            'INSERT OR IGNORE INTO players (name, turma, wins) VALUES (?, ?, 0)',
+            (name, turma)
+        )
+        conn.commit()
+        row = conn.execute(
+            'SELECT name, turma, wins FROM players WHERE name=? AND turma=?',
+            (name, turma)
+        ).fetchone()
+    return dict(row) if row else {'name': name, 'turma': turma, 'wins': 0}
 
 
 def db_add_win(player_name, player_turma):
-    if not supabase or not player_name:
+    if not player_name:
         return
+    player_turma = player_turma or ''
     try:
-        supabase.rpc('add_win', {'p_name': player_name, 'p_turma': player_turma}).execute()
+        with _db_lock, _get_conn() as conn:
+            conn.execute(
+                '''INSERT INTO players (name, turma, wins) VALUES (?, ?, 1)
+                   ON CONFLICT(name, turma) DO UPDATE SET wins = wins + 1''',
+                (player_name, player_turma)
+            )
+            conn.commit()
+        print(f'[DB] vitoria registrada: {player_name} ({player_turma})')
     except Exception as e:
         print(f'[DB] add_win error: {e}')
 
 
 def db_get_leaderboard():
-    if not supabase:
-        print('[DB] leaderboard: supabase client is None - checar SUPABASE_URL e SUPABASE_KEY')
-        return []
     try:
-        res = supabase.rpc('get_leaderboard').execute()
-        print(f'[DB] leaderboard raw: data={res.data}')
-        return res.data or []
+        with _get_conn() as conn:
+            rows = conn.execute(
+                'SELECT name, turma, wins FROM players ORDER BY wins DESC LIMIT 20'
+            ).fetchall()
+        result = [dict(r) for r in rows]
+        print(f'[DB] leaderboard: {len(result)} jogadores')
+        return result
     except Exception as e:
-        print(f'[DB] leaderboard error: {type(e).__name__}: {e}')
+        print(f'[DB] leaderboard error: {e}')
         return []
 
 
@@ -310,7 +336,7 @@ class GameRoom:
         room_id     = self.room_id
         player_sids = list(self.sids)
 
-        # Salva vitoria no Supabase
+        # Salva vitoria no banco
         db_add_win(winner_info.get('name'), winner_info.get('turma', ''))
 
         # Limpa a sala do dict global para evitar memory leak
@@ -325,10 +351,10 @@ class GameRoom:
             'leaderboard':  [],
         }, room=room_id)
 
-        # Busca o leaderboard em background após aguardar o Supabase confirmar a escrita,
+        # Busca e envia o leaderboard em background
         # depois envia leaderboard_update para cada jogador individualmente
         def push_leaderboard_direct():
-            time.sleep(1.2)  # aguarda o write do Supabase propagar
+            time.sleep(0.3)  # pequeno delay para garantir que o write commitou
             lb = db_get_leaderboard()
             if not lb:
                 time.sleep(1.0)  # retry uma vez se ainda vazio
