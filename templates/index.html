@@ -1259,15 +1259,17 @@ const MAT = {};
 function initThree() {
   const canvas = document.getElementById('three-canvas');
 
-  threeRenderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false });
+  threeRenderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true });
   threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_MOBILE ? 1.5 : 2));
   threeRenderer.setSize(window.innerWidth, window.innerHeight);
   threeRenderer.shadowMap.enabled = false;
   threeRenderer.toneMapping = THREE.ACESFilmicToneMapping;
   threeRenderer.toneMappingExposure = 1.2;
+  threeRenderer.setClearColor(0x000000, 0); // fundo transparente para mostrar imagem do mapa
 
   threeScene = new THREE.Scene();
   threeScene.fog = new THREE.FogExp2(0x000408, 0.04);
+  threeScene.background = null; // fundo transparente — usa map-bg atrás do canvas
 
   // Camera — always top-down orthographic-style perspective
   // Arena is 24 wide (X) × 8 deep (Z). We need to fit it in the viewport.
@@ -2877,10 +2879,20 @@ function applyMap(mapId) {
 
   if (map && map.url) {
     bg.style.backgroundImage = `url('${map.url}')`;
-    bg.style.opacity = '0.28';
+    bg.style.opacity = '0.55';
+    // Torna o chão 3D semi-transparente para a imagem aparecer atrás
+    if (threeFloor) {
+      threeFloor.material.transparent = true;
+      threeFloor.material.opacity = 0.18;
+    }
   } else {
     bg.style.opacity = '0';
     bg.style.backgroundImage = 'none';
+    // Restaura o chão opaco
+    if (threeFloor) {
+      threeFloor.material.transparent = false;
+      threeFloor.material.opacity = 1.0;
+    }
   }
 
   if (!threeScene) return;
@@ -2901,6 +2913,10 @@ function applyMap(mapId) {
 function clearMapBg() {
   const bg = _getMapBg();
   bg.style.opacity = '0';
+  if (threeFloor) {
+    threeFloor.material.transparent = false;
+    threeFloor.material.opacity = 1.0;
+  }
   setTimeout(() => { bg.style.backgroundImage = 'none'; }, 1200);
 }
 
