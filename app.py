@@ -64,6 +64,7 @@ PADDLE_H         = 0.22
 PADDLE_W         = 0.04
 BALL_R           = 0.025
 BALL_RESET_DELAY = 1.5
+MAX_SCORE        = 2   # pontos para vencer por placar
 
 # ── FILA / SALAS ──────────────────────────────────────────────────────────────
 rooms        = {}
@@ -111,6 +112,8 @@ class GameRoom:
         self.math_results   = [None, None]
         self.math_questions = [None, None]
         self._finalizing    = False
+        self._game_over_sent = False
+        self._ready_count   = 0
         self.speed_mult     = 1.0
         self.paddle_scales  = [1.0, 1.0]
         self.rally          = 0
@@ -155,7 +158,7 @@ class GameRoom:
     def _loop(self):
         TICK = 1 / 60
         _broadcast_acc = 0.0
-        BROADCAST_INTERVAL = 1 / 60  # sincroniza com o cliente que roda a 60fps
+        BROADCAST_INTERVAL = 1 / 20  # 20fps de rede — suficiente com interpolação no cliente
 
         while self.running:
             t0 = time.perf_counter()
@@ -240,11 +243,15 @@ class GameRoom:
 
     def _point(self, scorer_idx):
         with self._lock:
+            # Ignora gol se jogo parado ou pergunta ativa (bola congelada logicamente)
+            if not self.running or self.math_active:
+                return
             self.scores[scorer_idx] += 1
             self.rally     = 0
             self.last_hit  = -1
             self.speed_mult = 1.0
             self.paddle_scales = [1.0, 1.0]
+            reached_max = self.scores[scorer_idx] >= MAX_SCORE
 
         socketio.emit('score_update', {
             'scores':        self.scores[:],
@@ -255,10 +262,17 @@ class GameRoom:
         socketio.emit('effect_reverse', {'player_idx': -1}, room=self.room_id)
         self.ball = {'x': 0.0, 'y': 0.0, 'vx': 0.0, 'vy': 0.0}
 
+        if reached_max:
+            # Pequeno delay para o cliente processar o score_update antes do game_over
+            def end_by_score():
+                time.sleep(0.5)
+                self._end_game_by_score(scorer_idx)
+            threading.Thread(target=end_by_score, daemon=True).start()
+            return
+
         def delayed_reset():
             time.sleep(BALL_RESET_DELAY)
             if self.running:
-                # Bola vai em direção a quem tomou o gol (cria pressão)
                 direction = 1 if scorer_idx == 1 else -1
                 self.reset_ball(direction)
 
@@ -273,10 +287,24 @@ class GameRoom:
         else:
             winner_idx = random.choice([0, 1])
 
+        self._emit_game_over(winner_idx)
+
+    def _end_game_by_score(self, winner_idx):
+        self.running = False
+        self._emit_game_over(winner_idx)
+
+    def _emit_game_over(self, winner_idx):
+        with self._lock:
+            if self._game_over_sent:
+                return
+            self._game_over_sent = True
+
+        # Limpa a sala do dict global para evitar memory leak
+        rooms.pop(self.room_id, None)
+
         winner_sid  = self.sids[winner_idx]
         winner_info = self.players[winner_sid]['info']
 
-        # Emite game_over imediatamente sem esperar o DB
         socketio.emit('game_over', {
             'winner_idx':   winner_idx,
             'winner_name':  winner_info['name'],
@@ -285,7 +313,6 @@ class GameRoom:
             'leaderboard':  [],
         }, room=self.room_id)
 
-        # Salva win e depois manda leaderboard atualizado em background
         room_id = self.room_id
         def save_and_push_leaderboard():
             db_add_win(winner_info.get('name'), winner_info.get('turma', ''))
@@ -321,6 +348,8 @@ class GameRoom:
 
         def timeout_check():
             time.sleep(max_time)
+            if not self.running:
+                return
             for i in range(2):
                 if not self.math_answered[i]:
                     self._resolve_player_math(i, -1)
@@ -343,6 +372,7 @@ class GameRoom:
                 self.scores[player_idx] += 1
             else:
                 self.scores[player_idx] = max(0, self.scores[player_idx] - 1)
+            math_winner = player_idx if (correct and self.scores[player_idx] >= MAX_SCORE) else None
 
         sid = self.sids[player_idx]
         socketio.emit('math_result', {
@@ -362,6 +392,15 @@ class GameRoom:
         if all(self.math_answered) and not self._finalizing:
             threading.Thread(target=self._finalize_math, daemon=True).start()
 
+        # Verifica vitória por placar após ponto da matemática
+        if math_winner is not None and self.running:
+            def end_after_math():
+                time.sleep(1.0)
+                if self.running:
+                    self.math_active = False
+                    self._end_game_by_score(math_winner)
+            threading.Thread(target=end_after_math, daemon=True).start()
+
     def _finalize_math(self):
         with self._lock:
             if self._finalizing:
@@ -369,6 +408,10 @@ class GameRoom:
             self._finalizing = True
 
         time.sleep(1.2)
+
+        if not self.running:
+            self._finalizing = False
+            return
 
         r0, r1     = self.math_results
         winner_idx = None
@@ -409,7 +452,8 @@ class GameRoom:
             self._relaunch()
             def restore():
                 time.sleep(6)
-                self.speed_mult = min(1.0, self.speed_mult / 0.55)
+                if self.running:
+                    self.speed_mult = min(1.0, self.speed_mult / 0.55)
             threading.Thread(target=restore, daemon=True).start()
 
         elif effect_id == 'fast_opp':
@@ -423,8 +467,9 @@ class GameRoom:
             wi = winner_idx
             def reset_big():
                 time.sleep(8)
-                self.paddle_scales[wi] = 1.0
-                socketio.emit('effect_paddle', {'size': 1.0, 'player_idx': wi}, room=self.room_id)
+                if self.running:
+                    self.paddle_scales[wi] = 1.0
+                    socketio.emit('effect_paddle', {'size': 1.0, 'player_idx': wi}, room=self.room_id)
             threading.Thread(target=reset_big, daemon=True).start()
 
         elif effect_id == 'tiny_opp':
@@ -434,8 +479,9 @@ class GameRoom:
             li = loser_idx
             def reset_tiny():
                 time.sleep(8)
-                self.paddle_scales[li] = 1.0
-                socketio.emit('effect_paddle', {'size': 1.0, 'player_idx': li}, room=self.room_id)
+                if self.running:
+                    self.paddle_scales[li] = 1.0
+                    socketio.emit('effect_paddle', {'size': 1.0, 'player_idx': li}, room=self.room_id)
             threading.Thread(target=reset_tiny, daemon=True).start()
 
         elif effect_id == 'reverse':
@@ -443,7 +489,8 @@ class GameRoom:
             self._relaunch()
             def reset_rev():
                 time.sleep(6)
-                socketio.emit('effect_reverse', {'player_idx': -1}, room=self.room_id)
+                if self.running:
+                    socketio.emit('effect_reverse', {'player_idx': -1}, room=self.room_id)
             threading.Thread(target=reset_rev, daemon=True).start()
 
         elif effect_id == 'freeze':
@@ -451,7 +498,8 @@ class GameRoom:
             self.ball = {'x': self.ball['x'], 'y': self.ball['y'], 'vx': 0.0, 'vy': 0.0}
             def unfreeze():
                 time.sleep(2.5)
-                self._relaunch(toward_loser_idx=loser_idx)
+                if self.running:
+                    self._relaunch(toward_loser_idx=loser_idx)
             threading.Thread(target=unfreeze, daemon=True).start()
 
     # ── ESTADO ───────────────────────────────────────────────────────────────
@@ -797,8 +845,6 @@ def on_game_ready(data):
         return
     room = rooms[room_id]
     with room._lock:
-        if not hasattr(room, '_ready_count'):
-            room._ready_count = 0
         room._ready_count += 1
         if room._ready_count >= 2 and not room.running:
             room.start()
@@ -823,7 +869,7 @@ def on_disconnect():
     for room_id, room in list(rooms.items()):
         if sid in room.players:
             room.remove_player(sid)
-            del rooms[room_id]
+            rooms.pop(room_id, None)
             print(f"[GAME] {room_id} encerrada por desconexão de {sid}")
             break
 
