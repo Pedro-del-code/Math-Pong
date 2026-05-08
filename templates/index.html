@@ -2818,8 +2818,9 @@ const MAPS_FALLBACK = [
 ];
 let MAPS = [...MAPS_FALLBACK];
 
-// Carrega imagens do servidor ao iniciar
-(async function loadServerMaps() {
+// Carrega imagens do servidor ao iniciar — expõe promise para spinMapRoulette aguardar
+let _mapsReady = false;
+const _mapsReadyPromise = (async function loadServerMaps() {
   try {
     const res = await fetch('/maps');
     const data = await res.json();
@@ -2835,6 +2836,7 @@ let MAPS = [...MAPS_FALLBACK];
   } catch(e) {
     console.warn('[MAPS] Falha ao carregar mapas do servidor, usando fallback.');
   }
+  _mapsReady = true;
 })();
 
 // Elemento de fundo que fica atrás do canvas 3D
@@ -2862,29 +2864,25 @@ function applyMap(mapId) {
   const bg  = _getMapBg();
 
   if (map && map.url) {
-    // Imagem real do servidor — aplica como fundo com fade
     bg.style.backgroundImage = `url('${map.url}')`;
-    bg.style.opacity = '0.28';  // semi-transparente para não ofuscar a arena 3D
+    bg.style.opacity = '0.28';
   } else {
-    // Sem imagem — remove o fundo e ajusta cores da cena Three.js
     bg.style.opacity = '0';
     bg.style.backgroundImage = 'none';
   }
 
-  // Ajuste de fog/floor da cena 3D por tipo de mapa (mantém compatibilidade)
   if (!threeScene) return;
-  switch(mapId) {
-    case 'space':
-      threeScene.fog.color.setHex(0x000010);
-      threeFloor.material.color.setHex(0x000820);
-      break;
-    case 'retro':
-      threeScene.fog.color.setHex(0x100005);
-      threeFloor.material.color.setHex(0x0a0005);
-      break;
-    default:
-      threeScene.fog.color.setHex(0x000408);
-      threeFloor.material.color.setHex(0x010812);
+  // Deriva tema pelo id (funciona tanto para fallbacks quanto arquivos do servidor)
+  const id = (mapId || '').toLowerCase();
+  if (id.includes('space') || id.includes('espa') || id.includes('cosmos')) {
+    threeScene.fog.color.setHex(0x000010);
+    threeFloor.material.color.setHex(0x000820);
+  } else if (id.includes('retro') || id.includes('neon') || id.includes('pixel')) {
+    threeScene.fog.color.setHex(0x100005);
+    threeFloor.material.color.setHex(0x0a0005);
+  } else {
+    threeScene.fog.color.setHex(0x000408);
+    threeFloor.material.color.setHex(0x010812);
   }
 }
 
@@ -2901,6 +2899,14 @@ function spinMapRoulette() {
     const title   = document.getElementById('map-roulette-title');
     const status  = document.getElementById('map-roulette-status');
     const chosen  = document.getElementById('map-chosen-display');
+
+    // Aguarda o fetch de /maps terminar antes de sortear
+    (async () => {
+      if (!_mapsReady) {
+        title.textContent = '🗺 CARREGANDO MAPAS...';
+        overlay.classList.add('show');
+        await _mapsReadyPromise;
+      }
     const ITEM_W  = 152;
     const winnerIdx = Math.floor(Math.random() * MAPS.length);
     const winner = MAPS[winnerIdx];
@@ -2954,6 +2960,7 @@ function spinMapRoulette() {
         }, 1800);
       }, 3300);
     }));
+    })(); // fecha async IIFE
   });
 }
 
