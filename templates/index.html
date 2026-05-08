@@ -1209,7 +1209,7 @@ html, body {
   <div class="howto-section">
     <div class="howto-title">📐 COMO FUNCIONA</div>
     <div class="howto-row"><div class="howto-icon">✖️</div><div class="howto-text">Rebata o <strong>X</strong> com sua raquete. Se passar, o oponente marca ponto.</div></div>
-    <div class="howto-row"><div class="howto-icon">⚡</div><div class="howto-text">A cada <strong>3 rebatidas</strong>, uma pergunta de matemática aparece para os dois jogadores.</div></div>
+    <div class="howto-row"><div class="howto-icon">⚡</div><div class="howto-text">A cada <strong>25 segundos</strong> uma pergunta de matemática aparece (5s de intervalo entre elas).</div></div>
     <div class="howto-row"><div class="howto-icon">✅</div><div class="howto-text"><strong>Acertou?</strong> Você gira a roleta e ganha um <strong>buff</strong> poderoso!</div></div>
     <div class="howto-row"><div class="howto-icon">❌</div><div class="howto-text"><strong>Errou ou demorou?</strong> -1 ponto e recebe um <strong>debuff</strong> (raquete minúscula).</div></div>
     <div class="howto-row"><div class="howto-icon">⏱</div><div class="howto-text">A partida dura <strong>3 minutos</strong>. Quem tiver mais pontos no final vence!</div></div>
@@ -1223,6 +1223,12 @@ html, body {
       <div class="effect-card"><div class="ec-icon">🔬</div><div class="ec-text"><strong>Raquete Minúscula</strong>Inimigo encolhe por 8s</div></div>
       <div class="effect-card"><div class="ec-icon">🔄</div><div class="ec-text"><strong>Controles Invertidos</strong>Inimigo confuso por 6s</div></div>
       <div class="effect-card"><div class="ec-icon">🧊</div><div class="ec-text"><strong>Bola Congelada</strong>Bola para por 2 segundos</div></div>
+      <div class="effect-card"><div class="ec-icon">🔮</div><div class="ec-text"><strong>Multi-Bola</strong>+2 bolas extras por 12s!</div></div>
+      <div class="effect-card"><div class="ec-icon">🎱</div><div class="ec-text"><strong>Bola Gigante</strong>Bola enorme por 6s</div></div>
+      <div class="effect-card"><div class="ec-icon">🔥</div><div class="ec-text"><strong>Bola de Fogo</strong>Bola flamejante por 8s</div></div>
+      <div class="effect-card"><div class="ec-icon">⚽</div><div class="ec-text"><strong>Bola Minúscula</strong>Bola difícil de ver por 6s</div></div>
+      <div class="effect-card"><div class="ec-icon">🚀</div><div class="ec-text"><strong>Turbo</strong>Bola acelera por 5s!</div></div>
+      <div class="effect-card"><div class="ec-icon">🌀</div><div class="ec-text"><strong>Campo Girado</strong>Câmera vira por 5s</div></div>
     </div>
   </div>
   <button class="btn-secondary" onclick="closeHowto()" style="margin-top:8px;touch-action:manipulation;width:min(280px,85vw);">ENTENDI!</button>
@@ -1959,6 +1965,237 @@ let paddleHitGlow = [0, 0]; // flash intensity
 // ── BALL ROTATION ────────────────────────────────────────────────────────────
 let ballRotSpeed = { x: 0.03, y: 0.05, z: 0.02 };
 
+// ── MULTI-BALL SYSTEM ─────────────────────────────────────────────────────────
+let extraBalls = []; // { x, y, vx, vy, mesh, trailPool, life }
+let multiBallActive = false;
+
+function spawnExtraBalls(count = 2) {
+  multiBallActive = true;
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.random() - 0.5) * Math.PI * 0.5;
+    const dir   = ballState.vx >= 0 ? 1 : -1;
+    const mesh  = new THREE.Mesh(
+      new THREE.SphereGeometry(0.22, 10, 10),
+      new THREE.MeshStandardMaterial({
+        color: [0xffcc00, 0xff44aa, 0x00ff88, 0xcc44ff][i % 4],
+        emissive: [0xff8800, 0xff0066, 0x00cc44, 0x8800ff][i % 4],
+        emissiveIntensity: 2.5, roughness: 0.1, metalness: 0.3
+      })
+    );
+    mesh.position.set(0, 0.3, 0);
+    mesh.scale.setScalar(1.4);
+    if (threeScene) threeScene.add(mesh);
+    extraBalls.push({
+      x: 0, y: (Math.random() - 0.5) * 0.4,
+      vx: dir * BALL_SPEED_CLIENT * (0.9 + Math.random() * 0.3),
+      vy: Math.sin(angle) * BALL_SPEED_CLIENT,
+      mesh, life: 12 // 12 segundos
+    });
+  }
+  addEffectBadge('multiball', '🔮', `${count+1} BOLAS!`, 12000, '#cc44ff');
+  showEffectToast(`🔮 MULTI-BOLA! +${count} bolas por 12s!`);
+}
+
+function updateExtraBalls(dt) {
+  if (!extraBalls.length) return;
+  const toRemove = [];
+  extraBalls.forEach((eb, idx) => {
+    eb.life -= dt;
+    if (eb.life <= 0) { toRemove.push(idx); if (threeScene) threeScene.remove(eb.mesh); return; }
+
+    eb.x += eb.vx;
+    eb.y += eb.vy;
+
+    if (eb.y < -1 + BALL_R_CLIENT) { eb.y = -1 + BALL_R_CLIENT; eb.vy = Math.abs(eb.vy); SFX.wallHit(); }
+    if (eb.y >  1 - BALL_R_CLIENT) { eb.y =  1 - BALL_R_CLIENT; eb.vy = -Math.abs(eb.vy); SFX.wallHit(); }
+
+    // Player paddle hit
+    if (eb.x < -0.86 + BALL_R_CLIENT && eb.vx < 0) {
+      if (Math.abs(eb.y - myPaddleY) < (PADDLE_H_CLIENT * paddleScaleP0) + BALL_R_CLIENT) {
+        eb.x = -0.86 + BALL_R_CLIENT;
+        const relY = (eb.y - myPaddleY) / (PADDLE_H_CLIENT * paddleScaleP0);
+        const angle = relY * Math.PI * 0.38;
+        eb.vx = Math.abs(Math.cos(angle)) * BALL_SPEED_CLIENT;
+        eb.vy = Math.sin(angle) * BALL_SPEED_CLIENT;
+        paddleHitGlow[0] = 1.0;
+        spawnParticles3D(gameToThreeX(eb.x), gameToThreeZ(eb.y), 0x00eeff, 8);
+        SFX.paddleHit();
+      }
+    }
+    // AI paddle hit
+    if (eb.x > 0.86 - BALL_R_CLIENT && eb.vx > 0) {
+      if (Math.abs(eb.y - oppPaddleY) < (PADDLE_H_CLIENT * paddleScaleP1) + BALL_R_CLIENT) {
+        eb.x = 0.86 - BALL_R_CLIENT;
+        const relY = (eb.y - oppPaddleY) / (PADDLE_H_CLIENT * paddleScaleP1);
+        const angle = relY * Math.PI * 0.38;
+        eb.vx = -(Math.abs(Math.cos(angle))) * BALL_SPEED_CLIENT;
+        eb.vy = Math.sin(angle) * BALL_SPEED_CLIENT;
+        paddleHitGlow[1] = 1.0;
+        spawnParticles3D(gameToThreeX(eb.x), gameToThreeZ(eb.y), 0xff4466, 8);
+        SFX.paddleHit();
+      }
+    }
+
+    // Gol pelas bolas extras — apenas pontua no AI mode
+    if (aiMode) {
+      if (eb.x < -1.05) { aiPoint(1); toRemove.push(idx); if (threeScene) threeScene.remove(eb.mesh); return; }
+      if (eb.x >  1.05) { aiPoint(0); toRemove.push(idx); if (threeScene) threeScene.remove(eb.mesh); return; }
+    }
+
+    // Atualiza posição 3D
+    if (eb.mesh) {
+      eb.mesh.position.set(gameToThreeX(eb.x), 0.3 + Math.sin(globalTime * 4 + idx) * 0.08, gameToThreeZ(eb.y));
+      eb.mesh.rotation.x += 0.07; eb.mesh.rotation.y += 0.09;
+      // Pulsa emissiveIntensity
+      eb.mesh.material.emissiveIntensity = 2.0 + Math.sin(globalTime * 6 + idx) * 1.0;
+      eb.mesh.material.opacity = Math.min(1, eb.life * 0.5);
+    }
+  });
+  // Remove de trás para frente
+  toRemove.reverse().forEach(i => extraBalls.splice(i, 1));
+  if (!extraBalls.length) multiBallActive = false;
+}
+
+// ── BALL FIRE EFFECT ──────────────────────────────────────────────────────────
+let ballFireActive = false;
+let ballFireTimer  = 0;
+let _fireParticles = [];
+
+function activateBallFire(duration = 8) {
+  ballFireActive = true;
+  ballFireTimer  = duration;
+  if (threeBall) {
+    threeBall.traverse(child => {
+      if (child.isMesh) {
+        child.material.emissive.setHex(0xff4400);
+        child.material.emissiveIntensity = 4.0;
+      }
+    });
+  }
+  addEffectBadge('fire-ball', '🔥', 'BOLA DE FOGO!', duration * 1000, '#ff4400');
+  showEffectToast('🔥 BOLA DE FOGO por ' + duration + 's!');
+}
+
+function deactivateBallFire() {
+  ballFireActive = false;
+  if (threeBall) {
+    threeBall.traverse(child => {
+      if (child.isMesh && child.material.emissive) {
+        child.material.emissive.setHex(0x7744cc);
+        child.material.emissiveIntensity = 1.5;
+      }
+    });
+  }
+}
+
+// ── CAMERA SHAKE ─────────────────────────────────────────────────────────────
+let camShakeIntensity = 0;
+let camShakeTimer     = 0;
+
+function triggerCamShake(intensity = 0.25, duration = 0.4) {
+  camShakeIntensity = intensity;
+  camShakeTimer     = duration;
+}
+
+// ── BIG BALL EFFECT ───────────────────────────────────────────────────────────
+let bigBallActive = false;
+let bigBallTimer  = 0;
+
+function activateBigBall(duration = 6) {
+  bigBallActive = true;
+  bigBallTimer  = duration;
+  if (threeBall) threeBall.scale.setScalar(3.2);
+  addEffectBadge('big-ball', '🎱', 'BOLA GIGANTE!', duration * 1000, '#ffcc00');
+  showEffectToast('🎱 BOLA GIGANTE por ' + duration + 's!');
+}
+
+function deactivateBigBall() {
+  bigBallActive = false;
+  if (threeBall) threeBall.scale.setScalar(1.6);
+}
+
+// ── FIELD FLIP ────────────────────────────────────────────────────────────────
+let fieldFlipActive = false;
+let fieldFlipTimer  = 0;
+
+function activateFieldFlip(duration = 5) {
+  fieldFlipActive = true;
+  fieldFlipTimer  = duration;
+  // Inverte câmera no eixo Z para efeito visual
+  BASE_CAM.z = 3.5;
+  BASE_CAM.x = 0;
+  addEffectBadge('field-flip', '🌀', 'CAMPO GIRADO!', duration * 1000, '#00eeff');
+  showEffectToast('🌀 CAMPO GIRADO por ' + duration + 's!');
+}
+
+function deactivateFieldFlip() {
+  fieldFlipActive = false;
+  BASE_CAM.z = 0;
+}
+
+// ── SPEED SURGE ───────────────────────────────────────────────────────────────
+let speedSurgeActive = false;
+let speedSurgeTimer  = 0;
+
+function activateSpeedSurge(duration = 5) {
+  speedSurgeActive = true;
+  speedSurgeTimer  = duration;
+  if (aiMode) {
+    ballState.vx *= 1.8; ballState.vy *= 1.8;
+  }
+  addEffectBadge('speed-surge', '⚡', 'TURBO!', duration * 1000, '#ffcc00');
+  showEffectToast('⚡ TURBO! Bola acelerada por ' + duration + 's!');
+}
+
+function deactivateSpeedSurge() {
+  speedSurgeActive = false;
+}
+
+// ── MINI PADDLE EFFECT ────────────────────────────────────────────────────────
+function activateMiniBall(duration = 6) {
+  if (threeBall) threeBall.scale.setScalar(0.5);
+  addEffectBadge('mini-ball', '⚽', 'BOLA MINÚSCULA!', duration * 1000, '#00ff88');
+  showEffectToast('⚽ BOLA MINÚSCULA por ' + duration + 's!');
+  setTimeout(() => { if (threeBall) threeBall.scale.setScalar(1.6); }, duration * 1000);
+}
+
+// ── VISUAL EFFECTS TICKER ─────────────────────────────────────────────────────
+function tickVisualEffects(dt) {
+  if (ballFireActive) {
+    ballFireTimer -= dt;
+    if (ballFireTimer <= 0) deactivateBallFire();
+    else {
+      // spawn fire particles
+      const bx = gameToThreeX(ballState.x), bz = gameToThreeZ(ballState.y);
+      spawnParticles3D(bx + (Math.random()-0.5)*0.3, bz + (Math.random()-0.5)*0.3, 0xff4400, 1);
+    }
+  }
+  if (bigBallActive) {
+    bigBallTimer -= dt;
+    if (bigBallTimer <= 0) deactivateBigBall();
+    else if (threeBall) threeBall.scale.setScalar(3.2 + Math.sin(globalTime * 8) * 0.3);
+  }
+  if (fieldFlipActive) {
+    fieldFlipTimer -= dt;
+    if (fieldFlipTimer <= 0) deactivateFieldFlip();
+    else BASE_CAM.z = 3.5 + Math.sin(globalTime * 2) * 0.5;
+  }
+  if (speedSurgeActive) {
+    speedSurgeTimer -= dt;
+    if (speedSurgeTimer <= 0) deactivateSpeedSurge();
+  }
+  if (camShakeTimer > 0) {
+    camShakeTimer -= dt;
+    if (camShakeTimer > 0) {
+      const shake = camShakeIntensity * (camShakeTimer > 0 ? 1 : 0);
+      threeCamera.position.x += (Math.random() - 0.5) * shake;
+      threeCamera.position.z += (Math.random() - 0.5) * shake;
+    } else {
+      camShakeIntensity = 0;
+    }
+  }
+}
+
 // ── CAMERA CINEMATIC ─────────────────────────────────────────────────────────
 let BASE_CAM = { x: 0, y: 9, z: 0 };
 
@@ -1989,8 +2226,10 @@ function threeLoop(now) {
   threeCamera.lookAt(BASE_CAM.x, 0, BASE_CAM.z);
 
   if (gameRunning3D) {
-    // ── Interpolação multiplayer (dentro do RAF, delta-time real) ──
-    if (!aiMode && !gamePaused) {
+    // ── Efeitos visuais (fogo, bola gigante, shake, multi-ball) ──
+    tickVisualEffects(dt);
+    if (aiMode && !gamePaused) updateExtraBalls(dt);
+
       // Paddle: lerp rápido para responsividade visual
       const paddleAlpha = 1 - Math.pow(1 - 0.92, dt * 60); // ~92% por frame = muito responsivo
       oppPaddleY    += (_oppTargetY  - oppPaddleY)    * paddleAlpha;
@@ -2357,6 +2596,12 @@ const EFFECTS = [
   { id:'small_enemy',    icon:'🔬', label:'INIMIGO MINÚSCULO',    color:'#cc44ff' },
   { id:'reverse_enemy',  icon:'🔄', label:'CONTROLES INVERTIDOS', color:'#ffcc00' },
   { id:'freeze_ball',    icon:'🧊', label:'BOLA CONGELADA',       color:'#88ccff' },
+  { id:'multi_ball',     icon:'🔮', label:'MULTI-BOLA',           color:'#cc44ff' },
+  { id:'big_ball',       icon:'🎱', label:'BOLA GIGANTE',         color:'#ffcc00' },
+  { id:'fire_ball',      icon:'🔥', label:'BOLA DE FOGO',         color:'#ff4400' },
+  { id:'mini_ball',      icon:'⚽', label:'BOLA MINÚSCULA',       color:'#00ff88' },
+  { id:'speed_surge',    icon:'🚀', label:'TURBO',                color:'#ffcc00' },
+  { id:'field_flip',     icon:'🌀', label:'CAMPO GIRADO',         color:'#00eeff' },
 ];
 
 socket.on('roulette_spin', data => {
@@ -2473,6 +2718,29 @@ function applyEffect(effectId, isMe) {
       break;
     case 'fast_enemy':
       showEffectToast(isMe ? '⚡ Velocidade do inimigo aumentada!' : '⚡ Bola acelerada!');
+      break;
+    case 'multi_ball':
+      spawnExtraBalls(2);
+      triggerCamShake(0.2, 0.4);
+      break;
+    case 'big_ball':
+      activateBigBall(6);
+      triggerCamShake(0.15, 0.3);
+      break;
+    case 'fire_ball':
+      activateBallFire(8);
+      triggerCamShake(0.1, 0.25);
+      break;
+    case 'mini_ball':
+      activateMiniBall(6);
+      break;
+    case 'speed_surge':
+      activateSpeedSurge(5);
+      triggerCamShake(0.3, 0.5);
+      break;
+    case 'field_flip':
+      activateFieldFlip(5);
+      triggerCamShake(0.4, 0.6);
       break;
   }
 }
@@ -3203,11 +3471,13 @@ function startAIGame() {
   spinMapRoulette().then(() => {
     startCountdown();
 
-    let aiTimeLeft   = 180;
-    let aiRally      = 0;
-    let aiMathActive = false;
-    let aiAccum      = 0;
-    const AI_STEP    = 1 / 60;
+    let aiTimeLeft      = 180;
+    let aiRally         = 0;
+    let aiMathActive    = false;
+    let aiAccum         = 0;
+    const AI_STEP       = 1 / 60;
+    let aiMathTimer     = 25;   // primeira pergunta em 25s
+    let aiMathCooldown  = 0;    // cooldown de 5s após cada pergunta
 
     function aiLoop(now) {
       if (!aiMode) return;
@@ -3232,6 +3502,21 @@ function startAIGame() {
         const mins = Math.floor(t / 60), secs = String(t % 60).padStart(2, '0');
         const timerEl = document.getElementById('game-timer');
         if (timerEl) { timerEl.textContent = `${mins}:${secs}`; timerEl.classList.toggle('urgent', t <= 30); }
+      }
+
+      // Math question timer: a cada 25s (com cooldown de 5s entre perguntas)
+      if (!aiMathActive) {
+        if (aiMathCooldown > 0) {
+          aiMathCooldown -= rawDt;
+        } else {
+          aiMathTimer -= rawDt;
+          if (aiMathTimer <= 0) {
+            aiMathActive = true;
+            aiMathTimer  = 25;       // próxima em 25s
+            aiMathCooldown = 5;      // delay de 5s após terminar
+            triggerAIMath(() => { aiMathActive = false; });
+          }
+        }
       }
 
       // Fisica em passos fixos de 1/60s
@@ -3260,10 +3545,6 @@ function startAIGame() {
             spawnParticles3D(gameToThreeX(b.x), gameToThreeZ(b.y), 0x00eeff, IS_MOBILE ? 8 : 16);
             SFX.paddleHit();
             aiRally++;
-            if (aiRally % 3 === 0 && !aiMathActive) {
-              aiMathActive = true;
-              triggerAIMath(() => { aiMathActive = false; });
-            }
           }
         }
 
@@ -3369,11 +3650,19 @@ function triggerAIMath(onDone) {
     });
     const fbEl = aiOverlay.querySelector('#ai-fb');
     if (correct) {
-      fbEl.style.color='#00ff88'; fbEl.textContent='✓ CORRETO! ⚡ BUFF ATIVADO!';
-      SFX.correctAnswer(); showBigFeedback('correct','✓ BUFF!');
-      paddleScaleP0 = 1.8;
-      addEffectBadge('buff-paddle','🏓','Raquete gigante!',8000,'#00ff88');
-      setTimeout(() => { if(aiMode) paddleScaleP0=1.0; },8000);
+      fbEl.style.color='#00ff88'; fbEl.textContent='✓ CORRETO! ⚡ EFEITO ATIVADO!';
+      SFX.correctAnswer(); showBigFeedback('correct','✓ EFEITO!');
+      // Sorteia um efeito visual aleatório ao acertar
+      const aiCorrectEffects = [
+        () => { paddleScaleP0 = 1.8; addEffectBadge('buff-paddle','🏓','Raquete gigante!',8000,'#00ff88'); setTimeout(() => { if(aiMode) paddleScaleP0=1.0; },8000); },
+        () => spawnExtraBalls(2),
+        () => { activateBigBall(6); triggerCamShake(0.15, 0.3); },
+        () => { activateBallFire(8); triggerCamShake(0.1, 0.25); },
+        () => { activateFieldFlip(5); triggerCamShake(0.4, 0.6); },
+        () => activateMiniBall(6),
+        () => { paddleScaleP1 = 0.45; addEffectBadge('debuff-enemy','🔬','Inimigo encolhido!',6000,'#cc44ff'); setTimeout(() => { if(aiMode) paddleScaleP1=1.0; },6000); },
+      ];
+      aiCorrectEffects[Math.floor(Math.random() * aiCorrectEffects.length)]();
     } else {
       scores[0] = Math.max(0, scores[0]-1);
       document.querySelector('#s0 .score-val').textContent = scores[0];
@@ -3464,6 +3753,11 @@ function goMenu() {
   if (ao) ao.style.display = 'none';
   roomId = null; gamePaused = false; reverseControls = false;
   paddleScaleP0=1.0; paddleScaleP1=1.0;
+  // Limpa extra balls
+  extraBalls.forEach(eb => { if (threeScene && eb.mesh) threeScene.remove(eb.mesh); });
+  extraBalls = []; multiBallActive = false;
+  deactivateBallFire(); deactivateBigBall(); deactivateFieldFlip(); deactivateSpeedSurge();
+  BASE_CAM = { x: 0, y: 9, z: 0 };
   gameRunning3D = false;
   hide('screen-win'); hide('hud'); hide('opponent-label'); hide('mobile-controls');
   deactivateSwipeZone();
