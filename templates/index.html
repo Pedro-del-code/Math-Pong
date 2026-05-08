@@ -1983,10 +1983,15 @@ function threeLoop(now) {
   }
 
   // Camera sempre suave no centro
-  threeCamera.position.x += (BASE_CAM.x - threeCamera.position.x) * 0.1;
-  threeCamera.position.y += (BASE_CAM.y - threeCamera.position.y) * 0.1;
-  threeCamera.position.z += (BASE_CAM.z - threeCamera.position.z) * 0.1;
-  threeCamera.lookAt(BASE_CAM.x, 0, BASE_CAM.z);
+  const camDx = BASE_CAM.x - threeCamera.position.x;
+  const camDy = BASE_CAM.y - threeCamera.position.y;
+  const camDz = BASE_CAM.z - threeCamera.position.z;
+  if (Math.abs(camDx) > 0.001 || Math.abs(camDy) > 0.001 || Math.abs(camDz) > 0.001) {
+    threeCamera.position.x += camDx * 0.1;
+    threeCamera.position.y += camDy * 0.1;
+    threeCamera.position.z += camDz * 0.1;
+    threeCamera.lookAt(BASE_CAM.x, 0, BASE_CAM.z);
+  }
 
   if (gameRunning3D) {
     // ── Interpolação multiplayer (dentro do RAF, delta-time real) ──
@@ -2006,8 +2011,14 @@ function threeLoop(now) {
         window._ballY = _ballTargetY;
       } else {
         // Dead-reckoning: avança o alvo baseado na velocidade conhecida (suaviza lag de rede)
-        _ballTargetX += (ballState.vx || 0) * dt * 60 * 0.5;
-        _ballTargetY += (ballState.vy || 0) * dt * 60 * 0.5;
+        // Clamp da contribuição de velocidade para evitar overshooting em lag spike
+        const drVx = Math.max(-0.04, Math.min(0.04, ballState.vx || 0));
+        const drVy = Math.max(-0.04, Math.min(0.04, ballState.vy || 0));
+        _ballTargetX += drVx * dt * 60 * 0.5;
+        _ballTargetY += drVy * dt * 60 * 0.5;
+        // Se target saiu completamente da arena, descarta dead-reckoning
+        if (_ballTargetX < -1.2 || _ballTargetX > 1.2) _ballTargetX = ballState.x || 0;
+        if (_ballTargetY < -1.1 || _ballTargetY > 1.1) _ballTargetY = ballState.y || 0;
         window._ballX += (_ballTargetX - window._ballX) * ballAlpha;
         window._ballY += (_ballTargetY - window._ballY) * ballAlpha;
       }
@@ -2093,7 +2104,37 @@ if (!IS_MOBILE) initTrail();
 // ══════════════════════════════════════════════════════════════════════════════
 // SOCKET.IO
 // ══════════════════════════════════════════════════════════════════════════════
-const socket = io();
+const socket = io({
+  reconnection: true,
+  reconnectionAttempts: 10,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000,
+  timeout: 8000,
+});
+
+// ── CONNECTION STATE BANNER ────────────────────────────────────────────────────
+(function() {
+  let _banner = null;
+  function _getBanner() {
+    if (!_banner) {
+      _banner = document.createElement('div');
+      _banner.id = 'conn-banner';
+      _banner.style.cssText = [
+        'position:fixed','top:0','left:0','width:100%','z-index:9999',
+        'background:rgba(255,68,102,0.92)','color:#fff',
+        'font-family:Orbitron,sans-serif','font-size:11px','letter-spacing:3px',
+        'text-align:center','padding:7px','pointer-events:none',
+        'display:none','backdrop-filter:blur(4px)',
+      ].join(';');
+      document.body.appendChild(_banner);
+    }
+    return _banner;
+  }
+  socket.on('connect',          () => { const b = _getBanner(); b.style.display='none'; });
+  socket.on('disconnect',       () => { const b = _getBanner(); b.textContent='⚠ DESCONECTADO — RECONECTANDO...'; b.style.display='block'; });
+  socket.on('reconnect_attempt',n  => { const b = _getBanner(); b.textContent=`⚠ RECONECTANDO... (tentativa ${n})`; b.style.display='block'; });
+  socket.on('reconnect_failed',    () => { const b = _getBanner(); b.textContent='✗ FALHA DE CONEXÃO — RECARREGUE A PÁGINA'; b.style.display='block'; });
+})();
 
 // ══════════════════════════════════════════════════════════════════════════════
 // GAME STATE
@@ -2380,7 +2421,10 @@ socket.on('roulette_spin', data => {
   const REPS = 4;
   const items = [];
   for (let r = 0; r < REPS; r++) EFFECTS.forEach(e => items.push(e));
-  const landingIdx = Math.floor(Math.random() * (items.length - EFFECTS.length)) + EFFECTS.length;
+  // Place the real effect at a safe landing index (middle third of strip)
+  const safeMin = Math.floor(items.length * 0.35);
+  const safeMax = Math.floor(items.length * 0.65);
+  const landingIdx = safeMin + Math.floor(Math.random() * (safeMax - safeMin));
   // Insert the actual effect at landing
   items[landingIdx] = EFFECTS.find(e => e.id === effectId) || EFFECTS[0];
 
@@ -2509,7 +2553,7 @@ socket.on('game_state', data => {
 
   const distX = Math.abs(_ballTargetX - window._ballX);
   const distY = Math.abs(_ballTargetY - window._ballY);
-  if (dirChanged || distX > 0.25 || distY > 0.25 ||
+  if (dirChanged || distX > 0.12 || distY > 0.12 ||
       (prevVx === 0 && (Math.abs(b.vx) > 0 || Math.abs(b.vy) > 0))) {
     window._ballX = _ballTargetX;
     window._ballY = _ballTargetY;
@@ -2643,7 +2687,15 @@ function showReadyFlash() {
 
 socket.on('math_question', data => { showMath(data); });
 socket.on('math_result',   data => { resolvemath(data); });
-socket.on('game_over',     data => { hide('hud'); hide('opponent-label'); hide('mobile-controls'); showWin(data); });
+socket.on('game_over', data => {
+  gameRunning3D = false;
+  gamePaused = false;
+  clearInterval(mathTimerInterval);
+  hide('hud'); hide('opponent-label'); hide('mobile-controls');
+  hideMathOverlay();
+  deactivateSwipeZone();
+  showWin(data);
+});
 socket.on('leaderboard_update', data => {
   const winScreen = document.getElementById('screen-win');
   if (winScreen && !winScreen.classList.contains('hidden')) {
@@ -2660,7 +2712,16 @@ async function fetchAndBuildPodium() {
   } catch(e) {}
   return false;
 }
-socket.on('opponent_left', ()   => { hide('hud'); hide('opponent-label'); hide('mobile-controls'); hideMathOverlay(); deactivateSwipeZone(); show('screen-disconnected'); });
+socket.on('opponent_left', () => {
+  clearInterval(mathTimerInterval);
+  gamePaused = false;
+  gameRunning3D = false;
+  window._aiMathLock = false;
+  hide('hud'); hide('opponent-label'); hide('mobile-controls');
+  hideMathOverlay();
+  deactivateSwipeZone();
+  show('screen-disconnected');
+});
 
 // ── MATH OVERLAY ──────────────────────────────────────────────────────────────
 let mathTimerInterval = null;
@@ -2751,8 +2812,8 @@ function hideMathOverlay() {
       // Snap posição ao último target conhecido
       window._ballX = _ballTargetX;
       window._ballY = _ballTargetY;
-      // Zera velocidade local — o próximo game_state do servidor vai resetar corretamente
-      ballState.vx = 0; ballState.vy = 0;
+      // Não zeramos vx/vy aqui — o próximo game_state já traz a velocidade correta
+      // e zerá-la causa 1 frame de bola "congelada" visível
       ballState._prevVx = 0;
     }
   }
@@ -2793,8 +2854,10 @@ function spawnWinStars() {
 }
 
 // ── WIN / PODIUM ──────────────────────────────────────────────────────────────
+let _winShowing = false;
 function showWin(data) {
-  if (document.getElementById('screen-win') && !document.getElementById('screen-win').classList.contains('hidden')) return; // já exibindo
+  if (_winShowing) return;
+  _winShowing = true;
   gameRunning3D = false;
   startConfetti(); spawnWinStars();
   const wsd0=document.getElementById('wsd-s0'),wsd1=document.getElementById('wsd-s1'),wsdn0=document.getElementById('wsd-n0'),wsdn1=document.getElementById('wsd-n1');
@@ -3033,7 +3096,7 @@ function startCountdown() {
     gamePaused = false;
     _aiLastRAF = null; // reset timing so first frame after unpause doesn't accumulate huge dt
     // Avisa o servidor que este cliente terminou roleta+countdown — física só começa quando os dois avisarem
-    if (roomId && !aiMode) socket.emit('game_ready', { room_id: roomId });
+    if (roomId && roomId !== 'ai-room' && !aiMode) socket.emit('game_ready', { room_id: roomId });
   }, 3500);
 }
 
@@ -3050,7 +3113,7 @@ function movePaddle(dir) {
   window._myPaddleY = myPaddleY;
   if (roomId) {
     const now = Date.now();
-    if (_lastEmittedY === null || Math.abs(myPaddleY - _lastEmittedY) > 0.005 || (now - _lastEmitTime) > 50) {
+    if (_lastEmittedY === null || Math.abs(myPaddleY - _lastEmittedY) > 0.004 || (now - _lastEmitTime) > 33) {
       socket.emit('move_paddle', { room_id: roomId, y: myPaddleY });
       _lastEmittedY = myPaddleY;
       _lastEmitTime = now;
@@ -3060,7 +3123,11 @@ function movePaddle(dir) {
 
 document.addEventListener('keydown', e => { if(keys[e.key]) return; keys[e.key]=true; if(['ArrowUp','ArrowDown',' '].includes(e.key)) e.preventDefault(); });
 document.addEventListener('keyup', e => { keys[e.key]=false; });
-function keyboardLoop() { if(keys['ArrowUp']||keys['w']||keys['W']) movePaddle(-1); if(keys['ArrowDown']||keys['s']||keys['S']) movePaddle(1); }
+function keyboardLoop() {
+  if (!gameRunning3D || gamePaused) return;
+  if(keys['ArrowUp']||keys['w']||keys['W']) movePaddle(-1);
+  if(keys['ArrowDown']||keys['s']||keys['S']) movePaddle(1);
+}
 setInterval(keyboardLoop, 16);
 
 const btnUp   = document.getElementById('btn-up');
@@ -3073,7 +3140,7 @@ function setupButton(btn, setHeld) {
 }
 setupButton(btnUp, v => upHeld=v);
 setupButton(btnDown, v => downHeld=v);
-setInterval(() => { if(upHeld) movePaddle(-1); if(downHeld) movePaddle(1); }, 16);
+setInterval(() => { if(!gameRunning3D || gamePaused) return; if(upHeld) movePaddle(-1); if(downHeld) movePaddle(1); }, 16);
 
 function activateSwipeZone() {
   const zone = document.getElementById('swipe-zone');
@@ -3111,7 +3178,7 @@ function joinQueue() {
 }
 
 function cancelQueue() {
-  socket.emit('cancel_queue');
+  socket.emit('cancel_queue', { name: myName, turma: myTurma });
   hide('screen-waiting'); show('screen-menu');
 }
 
@@ -3132,18 +3199,19 @@ socket.on('match_found', data => {
   clientRallyCount = 0;
   updateStreakDisplay();
 
-  document.getElementById('label0').textContent = myIdx === 0 ? myName.toUpperCase() : data.opponent.toUpperCase();
-  document.getElementById('label1').textContent = myIdx === 1 ? myName.toUpperCase() : data.opponent.toUpperCase();
+  const _setT = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  _setT('label0', myIdx === 0 ? myName.toUpperCase() : data.opponent.toUpperCase());
+  _setT('label1', myIdx === 1 ? myName.toUpperCase() : data.opponent.toUpperCase());
   document.querySelector('#s0 .score-val').textContent = '0';
   document.querySelector('#s1 .score-val').textContent = '0';
-  document.getElementById('opponent-label').textContent = `VS  ${data.opponent.toUpperCase()}  ·  ${(data.turma||'').toUpperCase()}`;
+  _setT('opponent-label', `VS  ${data.opponent.toUpperCase()}  ·  ${(data.turma||'').toUpperCase()}`);
 
-  document.getElementById('msb-name0').textContent = document.getElementById('label0').textContent;
-  document.getElementById('msb-name1').textContent = document.getElementById('label1').textContent;
-  document.getElementById('mbs-name0').textContent = document.getElementById('label0').textContent;
-  document.getElementById('mbs-name1').textContent = document.getElementById('label1').textContent;
-  document.getElementById('msb-score0').textContent = '0';
-  document.getElementById('msb-score1').textContent = '0';
+  _setT('msb-name0', document.getElementById('label0')?.textContent || '');
+  _setT('msb-name1', document.getElementById('label1')?.textContent || '');
+  _setT('mbs-name0', document.getElementById('label0')?.textContent || '');
+  _setT('mbs-name1', document.getElementById('label1')?.textContent || '');
+  _setT('msb-score0', '0');
+  _setT('msb-score1', '0');
 
   // Rebuild paddles with correct skins/colors
   buildPaddlesAndBall();
@@ -3314,7 +3382,7 @@ function aiPoint(scorerIdx) {
 
   if (scores[scorerIdx] >= 2) {
     if (aiInterval) { cancelAnimationFrame(aiInterval); aiInterval = null; }
-    aiMode = false;
+    aiMode = false; _winShowing = false;
     setTimeout(() => {
       hide('hud'); hide('opponent-label'); hide('mobile-controls');
       deactivateSwipeZone();
@@ -3446,7 +3514,7 @@ function genLocalQuestion() {
 
 function endAIGame() {
   if (!aiMode) return;
-  aiMode = false; window._aiMathLock = false;
+  aiMode = false; window._aiMathLock = false; _winShowing = false;
   if (aiInterval) { cancelAnimationFrame(aiInterval); aiInterval = null; }
   const ao = document.getElementById('ai-math-overlay');
   if (ao) ao.style.display = 'none';
@@ -3459,6 +3527,7 @@ function endAIGame() {
 // ── GO BACK TO MENU ───────────────────────────────────────────────────────────
 function goMenu() {
   aiMode = false; window._aiMathLock = false;
+  _winShowing = false;
   if (aiInterval) { cancelAnimationFrame(aiInterval); aiInterval = null; }
   const ao = document.getElementById('ai-math-overlay');
   if (ao) ao.style.display = 'none';
