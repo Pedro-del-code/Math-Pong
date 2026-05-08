@@ -2483,22 +2483,32 @@ let _ballTargetX = 0, _ballTargetY = 0;
 let _oppTargetY = 0;
 
 socket.on('game_state', data => {
-  if (aiMode) return;   // modo IA cuida do próprio estado, ignora pacotes de rede
+  if (aiMode) return;
   const b = data.ball;
+
+  // Durante pausa (pergunta ativa) — ignora posição/velocidade, apenas atualiza timer e paddle oponente
+  if (gamePaused) {
+    _oppTargetY = myIdx === 0 ? data.paddle1 : data.paddle0;
+    if (data.time_left !== undefined) {
+      const t = data.time_left;
+      const mins = Math.floor(t/60), secs = String(t%60).padStart(2,'0');
+      const timerEl = document.getElementById('game-timer');
+      if (timerEl) { timerEl.textContent = `${mins}:${secs}`; timerEl.classList.toggle('urgent', t <= 30); }
+    }
+    return;
+  }
 
   // Detectar mudança de direção (colisão com paddle no servidor) → snap para evitar "atravessar"
   const prevVx = ballState.vx || 0;
   const dirChanged = prevVx !== 0 && Math.sign(b.vx) !== Math.sign(prevVx);
 
-  // Atualiza o alvo de interpolação da bola
   _ballTargetX = b.x;
   _ballTargetY = b.y;
 
-  // Snap imediato se: direção inverteu (colisão), bola estava parada, ou distância grande (teletransporte)
   const distX = Math.abs(_ballTargetX - window._ballX);
   const distY = Math.abs(_ballTargetY - window._ballY);
   if (dirChanged || distX > 0.25 || distY > 0.25 ||
-      (!gamePaused && prevVx === 0 && (Math.abs(b.vx) > 0 || Math.abs(b.vy) > 0))) {
+      (prevVx === 0 && (Math.abs(b.vx) > 0 || Math.abs(b.vy) > 0))) {
     window._ballX = _ballTargetX;
     window._ballY = _ballTargetY;
   }
@@ -2506,7 +2516,6 @@ socket.on('game_state', data => {
   ballState.x = b.x; ballState.y = b.y;
   ballState.vx = b.vx; ballState.vy = b.vy;
 
-  // Apenas atualiza o paddle do oponente como alvo de interpolação
   _oppTargetY = myIdx === 0 ? data.paddle1 : data.paddle0;
 
   if (data.time_left !== undefined) {
@@ -2727,9 +2736,12 @@ function hideMathOverlay() {
   if (gameRunning3D) {
     gamePaused = false;
     if (!aiMode) {
+      // Snap posição ao último target conhecido
       window._ballX = _ballTargetX;
       window._ballY = _ballTargetY;
-      ballState._prevVx = ballState.vx;
+      // Zera velocidade local — o próximo game_state do servidor vai resetar corretamente
+      ballState.vx = 0; ballState.vy = 0;
+      ballState._prevVx = 0;
     }
   }
 }
