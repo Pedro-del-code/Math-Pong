@@ -1996,26 +1996,28 @@ function threeLoop(now) {
   if (gameRunning3D) {
     // ── Interpolação multiplayer (dentro do RAF, delta-time real) ──
     if (!aiMode && !gamePaused) {
-      // Paddle OPONENTE: lerp para suavizar rede (só o oponente precisa de interpolação)
-      const paddleAlpha = 1 - Math.pow(1 - 0.92, dt * 60); // ~92% por frame
+      // Paddle OPONENTE: lerp mais responsivo para reduzir lag de rede
+      const paddleAlpha = 1 - Math.pow(1 - 0.95, dt * 60); // ~95% por frame (era 92%)
       oppPaddleY    += (_oppTargetY  - oppPaddleY)    * paddleAlpha;
       window._oppPaddleY = oppPaddleY;
       // Paddle PRÓPRIO: snap direto — movePaddle já mantém _myPaddleY atualizado a 60fps
       // Qualquer lerp aqui criaria atraso entre input e visual
       window._myPaddleY = myPaddleY;
 
-      // Bola: lerp direto até a posição real do servidor (sem dead-reckoning acumulativo)
-      // Dead-reckoning acumulava erro a cada frame e era a principal causa de travamento
+      // Bola: interpolação adaptativa — suaviza jitter sem acumular erro
+      // Dead-reckoning foi removido pois acumulava erro a cada frame
       const prevVx = ballState._prevVx || 0;
       const currVx = ballState.vx || 0;
       const dirChanged = prevVx !== 0 && Math.sign(currVx) !== Math.sign(prevVx);
-      if (dirChanged) {
-        // Colisão detectada: snap imediato para posição do servidor
+      const distX = Math.abs(_ballTargetX - window._ballX);
+      const distY = Math.abs(_ballTargetY - window._ballY);
+      if (dirChanged || distX > 0.12 || distY > 0.12) {
+        // Snap imediato em colisão ou desvio grande — evita bola "atravessando"
         window._ballX = _ballTargetX;
         window._ballY = _ballTargetY;
       } else {
-        // Lerp suave: 85% por frame (~60fps) — suaviza jitter sem acumular erro
-        const ballAlpha = 1 - Math.pow(1 - 0.85, dt * 60);
+        // Lerp mais rápido (92%) para reduzir lag visual sem causar jitter
+        const ballAlpha = 1 - Math.pow(1 - 0.92, dt * 60);
         window._ballX += (_ballTargetX - window._ballX) * ballAlpha;
         window._ballY += (_ballTargetY - window._ballY) * ballAlpha;
       }
@@ -2484,21 +2486,29 @@ function applyEffect(effectId, isMe) {
       break;
     case 'big_paddle':
       if (isMe) {
+        // Meu paddle fica gigante
         if (myIdx === 0) paddleScaleP0 = 1.75; else paddleScaleP1 = 1.75;
         addEffectBadge('big_paddle', '🏓', 'Raquete Gigante!', 8000, '#00ff88');
         showEffectToast('🏓 Raquete gigante por 8s!');
         setTimeout(() => { if (myIdx === 0) paddleScaleP0 = 1.0; else paddleScaleP1 = 1.0; }, 8000);
       } else {
+        // Paddle do inimigo fica gigante (só visual no cliente)
         if (myIdx === 0) paddleScaleP1 = 1.75; else paddleScaleP0 = 1.75;
+        showEffectToast('🏓 Inimigo com raquete gigante!');
         setTimeout(() => { if (myIdx === 0) paddleScaleP1 = 1.0; else paddleScaleP0 = 1.0; }, 8000);
       }
       break;
     case 'small_enemy':
-      if (!isMe) {
-        if (myIdx === 0) paddleScaleP1 = 0.45; else paddleScaleP0 = 0.45;
-        setTimeout(() => { if (myIdx === 0) paddleScaleP1 = 1.0; else paddleScaleP0 = 1.0; }, 8000);
+      // Paddle do inimigo encolhe
+      if (myIdx === 0) paddleScaleP1 = 0.45; else paddleScaleP0 = 0.45;
+      if (isMe) {
         showEffectToast('🔬 Inimigo encolhido por 8s!');
         addEffectBadge('small_enemy', '🔬', 'Inimigo Pequeno!', 8000, '#cc44ff');
+        setTimeout(() => { if (myIdx === 0) paddleScaleP1 = 1.0; else paddleScaleP0 = 1.0; }, 8000);
+      } else {
+        showEffectToast('🔬 Sua raquete foi encolhida!');
+        addEffectBadge('small_enemy_debuff', '🔬', 'Raquete Pequena!', 8000, '#ff4466');
+        setTimeout(() => { if (myIdx === 0) paddleScaleP1 = 1.0; else paddleScaleP0 = 1.0; }, 8000);
       }
       break;
     case 'reverse_enemy':
@@ -2531,9 +2541,12 @@ socket.on('game_state', data => {
   if (aiMode) return;
   const b = data.ball;
 
-  // Durante pausa (pergunta ativa) — ignora posição/velocidade, apenas atualiza timer e paddle oponente
+  // Durante pausa (pergunta ativa) — atualiza paddle oponente e timer; mantém alvo de bola sincronizado
   if (gamePaused) {
     _oppTargetY = myIdx === 0 ? data.paddle1 : data.paddle0;
+    // Mantém target atualizado para snap correto ao despausar
+    _ballTargetX = b.x;
+    _ballTargetY = b.y;
     if (data.time_left !== undefined) {
       const t = data.time_left;
       const mins = Math.floor(t/60), secs = String(t%60).padStart(2,'0');
@@ -2586,6 +2599,8 @@ socket.on('score_update', data => {
   _ballTargetX = 0; _ballTargetY = 0;
   window._ballX = 0; window._ballY = 0;
   ballState._prevVx = 0;
+  window._ballX = 0; window._ballY = 0;
+  ballState._prevVx = 0;
 
   if (data.reset_effects) {
     reverseControls = false;
@@ -2616,22 +2631,26 @@ socket.on('score_update', data => {
     const isMe = data.buff_player === myIdx;
     showEffectToast(isMe ? '⚡ CORRETO! Girando roleta!' : '⚡ Inimigo acertou — buff vindo!');
     // Não executa o bloco de gol abaixo (scorer pode vir junto mas é ignorado aqui)
-  } else if (data.scorer !== undefined && data.scorer >= 0 && !data.math_penalty && !data.math_correct_buff && !_isMathWindow()) {
-    // Gol real — sem relação com matemática e fora da janela pós-resposta
-    armSwing = 8;
-    triggerGoalFlash(data.scorer);
-    SFX.goal(data.scorer === myIdx);
-    // 3D particles at goal position
-    spawnParticles3D(
-      data.scorer === 0 ? -9 : 9,
-      gameToThreeZ(0),
-      data.scorer === 0 ? 0x00eeff : 0xff4466,
-      IS_MOBILE ? 15 : 30
-    );
-    const scorerEl = document.querySelector(`#s${data.scorer} .score-val`);
-    if (scorerEl) { scorerEl.style.transform = 'scale(1.5)'; scorerEl.style.transition = 'transform 0.15s'; setTimeout(()=>{scorerEl.style.transform='scale(1)';},350); }
-    showReadyFlash();
-    spawnScorePopup(data.scorer);
+  } else if (data.scorer !== undefined && data.scorer >= 0 && !data.math_penalty && !data.math_correct_buff) {
+    // Gol real — apenas dispara efeito visual se NÃO for evento de matemática
+    // Verifica flag explícita do servidor; _isMathWindow apenas como proteção extra
+    const isMathRelated = data.from_math === true || data.math_goal === true;
+    if (!isMathRelated) {
+      armSwing = 8;
+      triggerGoalFlash(data.scorer);
+      SFX.goal(data.scorer === myIdx);
+      // 3D particles at goal position
+      spawnParticles3D(
+        data.scorer === 0 ? -9 : 9,
+        gameToThreeZ(0),
+        data.scorer === 0 ? 0x00eeff : 0xff4466,
+        IS_MOBILE ? 15 : 30
+      );
+      const scorerEl = document.querySelector(`#s${data.scorer} .score-val`);
+      if (scorerEl) { scorerEl.style.transform = 'scale(1.5)'; scorerEl.style.transition = 'transform 0.15s'; setTimeout(()=>{scorerEl.style.transform='scale(1)';},350); }
+      showReadyFlash();
+      spawnScorePopup(data.scorer);
+    }
   }
 
   // Atualiza placar no overlay de matemática
@@ -2730,9 +2749,9 @@ socket.on('opponent_left', () => {
 let mathTimerInterval = null;
 let mathTimerSec      = 8;
 let myTurnToAnswer    = false;
-// Bloqueia efeitos de gol por 2.5s após qualquer resolução de matemática
+// Bloqueia efeitos de gol por 1s após qualquer resolução de matemática (apenas backup)
 let _mathResolvedAt   = 0;
-function _isMathWindow() { return (Date.now() - _mathResolvedAt) < 2500; }
+function _isMathWindow() { return (Date.now() - _mathResolvedAt) < 1000; }
 
 function showMath(data) {
   myTurnToAnswer = true;
@@ -2816,12 +2835,10 @@ function hideMathOverlay() {
   if (gameRunning3D) {
     gamePaused = false;
     if (!aiMode) {
-      // Snap posição ao último target conhecido
+      // Snap imediato para posição mais recente do servidor — sem frame congelado
       window._ballX = _ballTargetX;
       window._ballY = _ballTargetY;
-      // Não zeramos vx/vy aqui — o próximo game_state já traz a velocidade correta
-      // e zerá-la causa 1 frame de bola "congelada" visível
-      ballState._prevVx = 0;
+      ballState._prevVx = 0; // força snap no próximo frame se houver desvio
     }
   }
 }
@@ -3212,7 +3229,7 @@ socket.on('waiting_for_opponent', () => { show('screen-waiting'); });
 socket.on('match_found', data => {
   roomId = data.room_id;
   myIdx  = data.player_idx;
-  window._myIdx = myIdx;
+  window._myIdx = myIdx;  // sincroniza imediatamente com o renderer Three.js
   myPaddleY  = 0; oppPaddleY = 0;
   _ballTargetX = 0; _ballTargetY = 0; _oppTargetY = 0;
   window._ballX = 0; window._ballY = 0;
