@@ -178,6 +178,10 @@ class GameRoom:
                 _broadcast_acc -= BROADCAST_INTERVAL
                 state = self._state()
                 state['time_left'] = int(self.time_left)
+                # Durante pergunta ativa, envia velocidade zero para o cliente congelar a bola
+                if self.math_active:
+                    state['ball']['vx'] = 0.0
+                    state['ball']['vy'] = 0.0
                 socketio.emit('game_state', state, room=self.room_id)
 
             elapsed = time.perf_counter() - t0
