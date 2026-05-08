@@ -308,26 +308,29 @@ class GameRoom:
         room_id     = self.room_id
         player_sids = list(self.sids)
 
-        # Salva vitoria e busca leaderboard ANTES de emitir game_over
-        # para garantir que o podio ja chegue preenchido no cliente
+        # Salva vitoria no Supabase
         db_add_win(winner_info.get('name'), winner_info.get('turma', ''))
-        lb = db_get_leaderboard()
 
         # Limpa a sala do dict global para evitar memory leak
         rooms.pop(room_id, None)
 
+        # Emite game_over imediatamente (sem leaderboard ainda) para não bloquear o cliente
         socketio.emit('game_over', {
             'winner_idx':   winner_idx,
             'winner_name':  winner_info['name'],
             'winner_turma': winner_info.get('turma', ''),
             'scores':       self.scores[:],
-            'leaderboard':  lb,
+            'leaderboard':  [],
         }, room=room_id)
 
-        # Envia leaderboard_update individualmente como garantia extra
-        # (room pode nao funcionar apos o cleanup do dict)
+        # Busca o leaderboard em background após aguardar o Supabase confirmar a escrita,
+        # depois envia leaderboard_update para cada jogador individualmente
         def push_leaderboard_direct():
-            time.sleep(0.8)
+            time.sleep(1.2)  # aguarda o write do Supabase propagar
+            lb = db_get_leaderboard()
+            if not lb:
+                time.sleep(1.0)  # retry uma vez se ainda vazio
+                lb = db_get_leaderboard()
             for sid in player_sids:
                 try:
                     socketio.emit('leaderboard_update', {'leaderboard': lb}, to=sid)
