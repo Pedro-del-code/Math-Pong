@@ -47,12 +47,14 @@ def db_add_win(player_name, player_turma):
 
 def db_get_leaderboard():
     if not supabase:
+        print('[DB] leaderboard: supabase client is None - checar SUPABASE_URL e SUPABASE_KEY')
         return []
     try:
         res = supabase.rpc('get_leaderboard').execute()
+        print(f'[DB] leaderboard raw: data={res.data}')
         return res.data or []
     except Exception as e:
-        print(f'[DB] leaderboard error: {e}')
+        print(f'[DB] leaderboard error: {type(e).__name__}: {e}')
         return []
 
 
