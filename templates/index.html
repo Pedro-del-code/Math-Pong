@@ -1833,7 +1833,7 @@ function buildPaddlesAndBall() {
   const skinDef = PADDLE_SKINS_3D[selectedPaddleSkin] || PADDLE_SKINS_3D['neon'];
 
   threePaddle0 = skinDef.build(0x00eeff);
-  threePaddle0.position.set(-9, 0, 0);
+  threePaddle0.position.set(-9, 0, 0); // x=-9 = gameToThreeX(-1.0) = borda da hitbox
   // Rotate paddle to lie flat — visible from top-down
   // Original paddles are tall (Y axis). Rotate so height goes along Z axis.
   threePaddle0.rotation.x = Math.PI / 2;
@@ -1841,7 +1841,7 @@ function buildPaddlesAndBall() {
   threeScene.add(threePaddle0);
 
   threePaddle1 = skinDef.build(0xff4466);
-  threePaddle1.position.set(9, 0, 0);
+  threePaddle1.position.set(9, 0, 0); // x=+9 = gameToThreeX(+1.0) = borda da hitbox
   threePaddle1.rotation.x = Math.PI / 2;
   threePaddle1.scale.set(1.5, 1.2, 1.2);
   threeScene.add(threePaddle1);
@@ -1996,10 +1996,13 @@ function threeLoop(now) {
   if (gameRunning3D) {
     // ── Interpolação multiplayer (dentro do RAF, delta-time real) ──
     if (!aiMode && !gamePaused) {
-      // Paddle: lerp rápido para responsividade visual
-      const paddleAlpha = 1 - Math.pow(1 - 0.92, dt * 60); // ~92% por frame = muito responsivo
+      // Paddle OPONENTE: lerp para suavizar rede (só o oponente precisa de interpolação)
+      const paddleAlpha = 1 - Math.pow(1 - 0.92, dt * 60); // ~92% por frame
       oppPaddleY    += (_oppTargetY  - oppPaddleY)    * paddleAlpha;
       window._oppPaddleY = oppPaddleY;
+      // Paddle PRÓPRIO: snap direto — movePaddle já mantém _myPaddleY atualizado a 60fps
+      // Qualquer lerp aqui criaria atraso entre input e visual
+      window._myPaddleY = myPaddleY;
 
       // Bola: snap imediato se mudou de direção (evita atravessar paddle visualmente)
       const prevVx = ballState._prevVx || 0;
@@ -2009,6 +2012,8 @@ function threeLoop(now) {
         // Direção inverteu — snap direto para evitar "atravessar" paddle
         window._ballX = _ballTargetX;
         window._ballY = _ballTargetY;
+        _ballTargetX = ballState.x || 0; // reseta target também para não acumular erro
+        _ballTargetY = ballState.y || 0;
       } else {
         // Dead-reckoning: avança o alvo baseado na velocidade conhecida (suaviza lag de rede)
         // Clamp da contribuição de velocidade para evitar overshooting em lag spike
@@ -2031,7 +2036,9 @@ function threeLoop(now) {
 
     if (threePaddle0) {
       const tz = gameToThreeZ(p0y);
-      threePaddle0.position.z += (tz - threePaddle0.position.z) * 0.25;
+      // Aplica direto — a interpolação já foi feita no nível lógico (paddleAlpha acima)
+      // Lerp duplo aqui causava atraso visual vs hitbox → bola "atravessando" paddle visível
+      threePaddle0.position.z = tz;
       const ts = paddleScaleP0;
       // After rotation.x=PI/2, Y scale controls the Z spread (paddle width)
       threePaddle0.scale.set(1.5, ts * 1.2, 1.2);
@@ -2043,7 +2050,7 @@ function threeLoop(now) {
     }
     if (threePaddle1) {
       const tz = gameToThreeZ(p1y);
-      threePaddle1.position.z += (tz - threePaddle1.position.z) * 0.25;
+      threePaddle1.position.z = tz;
       const ts = paddleScaleP1;
       threePaddle1.scale.set(1.5, ts * 1.2, 1.2);
       if (paddleHitGlow[1] > 0) {
@@ -2612,9 +2619,12 @@ socket.on('score_update', data => {
       setTimeout(() => { penEl.style.transform = 'scale(1)'; penEl.style.color = data.penalty_player === 0 ? 'var(--cyan)' : 'var(--red)'; }, 400);
     }
   } else if (data.math_correct_buff && data.buff_player !== undefined && data.buff_player >= 0) {
+    // Acerto de matemática → apenas feedback visual, SEM efeito de gol, SEM popup de ponto
     const isMe = data.buff_player === myIdx;
     showEffectToast(isMe ? '⚡ CORRETO! Girando roleta!' : '⚡ Inimigo acertou — buff vindo!');
-  } else if (data.scorer >= 0) {
+    // Não executa o bloco de gol abaixo (scorer pode vir junto mas é ignorado aqui)
+  } else if (data.scorer !== undefined && data.scorer >= 0 && !data.math_penalty && !data.math_correct_buff) {
+    // Gol real — sem relação com matemática
     armSwing = 8;
     triggerGoalFlash(data.scorer);
     SFX.goal(data.scorer === myIdx);
@@ -2628,14 +2638,14 @@ socket.on('score_update', data => {
     const scorerEl = document.querySelector(`#s${data.scorer} .score-val`);
     if (scorerEl) { scorerEl.style.transform = 'scale(1.5)'; scorerEl.style.transition = 'transform 0.15s'; setTimeout(()=>{scorerEl.style.transform='scale(1)';},350); }
     showReadyFlash();
-    // Não encerra aqui — aguarda o evento game_over do servidor para evitar dupla chamada de showWin
+    spawnScorePopup(data.scorer);
   }
 
+  // Atualiza placar no overlay de matemática
   const msb0 = document.getElementById('msb-score0'); const msb1 = document.getElementById('msb-score1');
   if (msb0) msb0.textContent = scores[0];
   if (msb1) msb1.textContent = scores[1];
 
-  if (data.scorer >= 0) spawnScorePopup(data.scorer);
   const ri = document.getElementById('rally-indicator');
   if (ri) ri.textContent = '';
 });
@@ -3110,8 +3120,8 @@ let _lastEmitTime = 0;
 function movePaddle(dir) {
   const d = reverseControls ? -dir : dir;
   myPaddleY = Math.max(-1+PADDLE_H_CLIENT, Math.min(1-PADDLE_H_CLIENT, myPaddleY + d*MOVE_SPEED));
-  window._myPaddleY = myPaddleY;
-  if (roomId) {
+  window._myPaddleY = myPaddleY; // atualização imediata — sem lerp para input do próprio jogador
+  if (roomId && roomId !== 'ai-room') {
     const now = Date.now();
     if (_lastEmittedY === null || Math.abs(myPaddleY - _lastEmittedY) > 0.004 || (now - _lastEmitTime) > 33) {
       socket.emit('move_paddle', { room_id: roomId, y: myPaddleY });
@@ -3315,10 +3325,10 @@ function startAIGame() {
         if (b.y < -1 + BALL_R_CLIENT) { b.y = -1 + BALL_R_CLIENT; b.vy = Math.abs(b.vy); SFX.wallHit(); }
         if (b.y >  1 - BALL_R_CLIENT) { b.y =  1 - BALL_R_CLIENT; b.vy = -Math.abs(b.vy); SFX.wallHit(); }
 
-        // Player paddle hit
-        if (b.x < -0.86 + BALL_R_CLIENT && b.vx < 0) {
+        // Player paddle hit — usa x=1.0 que corresponde à posição visual (gameToThreeX(1.0)=9)
+        if (b.x < -1.0 + BALL_R_CLIENT && b.vx < 0) {
           if (Math.abs(b.y - myPaddleY) < (PADDLE_H_CLIENT * paddleScaleP0) + BALL_R_CLIENT) {
-            b.x = -0.86 + BALL_R_CLIENT;
+            b.x = -1.0 + BALL_R_CLIENT;
             const relY  = (b.y - myPaddleY) / (PADDLE_H_CLIENT * paddleScaleP0);
             const angle = relY * Math.PI * 0.38;
             const spd   = Math.hypot(Math.cos(angle), Math.sin(angle));
@@ -3335,10 +3345,10 @@ function startAIGame() {
           }
         }
 
-        // AI paddle hit
-        if (b.x > 0.86 - BALL_R_CLIENT && b.vx > 0) {
+        // AI paddle hit — usa x=1.0 que corresponde à posição visual (gameToThreeX(1.0)=9)
+        if (b.x > 1.0 - BALL_R_CLIENT && b.vx > 0) {
           if (Math.abs(b.y - oppPaddleY) < (PADDLE_H_CLIENT * paddleScaleP1) + BALL_R_CLIENT) {
-            b.x = 0.86 - BALL_R_CLIENT;
+            b.x = 1.0 - BALL_R_CLIENT;
             const relY  = (b.y - oppPaddleY) / (PADDLE_H_CLIENT * paddleScaleP1);
             const angle = relY * Math.PI * 0.38;
             const spd   = Math.hypot(Math.cos(angle), Math.sin(angle));
@@ -3356,7 +3366,7 @@ function startAIGame() {
         oppPaddleY  = Math.max(-1 + PADDLE_H_CLIENT, Math.min(1 - PADDLE_H_CLIENT, oppPaddleY));
         window._oppPaddleY = oppPaddleY;
 
-        // Gol
+        // Gol — bola passou além do paddle (usa 1.05 para dar margem visual)
         if (b.x < -1.05) { aiPoint(1); aiAccum = 0; return; }
         if (b.x >  1.05) { aiPoint(0); aiAccum = 0; return; }
       }
