@@ -2163,7 +2163,7 @@ window._ballY = 0;
 
 const PADDLE_H_CLIENT = 0.22;
 const BALL_R_CLIENT   = 0.025;
-const BALL_SPEED_CLIENT = 0.018;  // aumentado de 0.009 — era lento demais a 60fps
+const BALL_SPEED_CLIENT = 0.009;  // alinhado com BALL_SPEED_BASE do servidor
 
 // ── AUDIO ────────────────────────────────────────────────────────────────────
 let _audioCtx = null;
@@ -2220,13 +2220,13 @@ document.addEventListener('pointerdown', ()=>getAudioCtx(), {once:true});
 document.addEventListener('keydown',     ()=>getAudioCtx(), {once:true});
 
 // ── SKIN PREVIEWS (tiny 2D canvas thumbnails) ──────────────────────────────
-function drawSkinPreview2D(canvas, type, skinKey, isP1) {
+function drawSkinPreview2D(canvas, type, skinKey, isP0) {
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0, 0, W, H);
 
   if (type === 'paddle') {
-    const color = isP1 ? '#ff4466' : '#00eeff';  // p0=ciano, p1=vermelho
+    const color = isP0 ? '#00eeff' : '#ff4466';  // p0=ciano, p1=vermelho
     const skin = PADDLE_SKINS_3D[skinKey];
     // Show distinct icons per skin
     ctx.shadowColor = color;
@@ -2532,6 +2532,15 @@ function applyEffect(effectId, isMe) {
 
 socket.on('effect_reverse', data => { if (data.player_idx === myIdx || data.player_idx === -1) reverseControls = false; });
 
+// Sincroniza tamanho de raquete via evento autoritativo do servidor
+socket.on('effect_paddle', data => {
+  const size = data.size;
+  const idx  = data.player_idx;
+  // Converte player_idx global para o índice visual local (p0/p1 no Three.js)
+  if (idx === 0) paddleScaleP0 = size;
+  else if (idx === 1) paddleScaleP1 = size;
+});
+
 // ── GAME STATE SYNC ────────────────────────────────────────────────────────────
 // Interpolation targets for smooth rendering despite network jitter
 let _ballTargetX = 0, _ballTargetY = 0;
@@ -2597,8 +2606,6 @@ socket.on('score_update', data => {
 
   // Snap bola ao centro no novo saque — evita fantasma de interpolação
   _ballTargetX = 0; _ballTargetY = 0;
-  window._ballX = 0; window._ballY = 0;
-  ballState._prevVx = 0;
   window._ballX = 0; window._ballY = 0;
   ballState._prevVx = 0;
 
@@ -3213,7 +3220,9 @@ function joinQueue() {
   if (!serie) { document.getElementById('inp-serie').focus(); return; }
   myName  = name;
   myTurma = turmaLetra ? `${serie}${turmaLetra}` : serie;
-  const level = parseInt(serie) || 9;
+  // Mapeia séries do ensino médio (1M,2M,3M) para os níveis 10,11,12 do servidor
+  const SERIE_TO_LEVEL = { '6':6,'7':7,'8':8,'9':9,'1M':10,'2M':11,'3M':12 };
+  const level = SERIE_TO_LEVEL[serie] || 9;
   hide('screen-menu');
   show('screen-waiting');
   socket.emit('join_queue', { name, turma: myTurma, level });
