@@ -354,10 +354,10 @@ class GameRoom:
         # Busca e envia o leaderboard em background
         # depois envia leaderboard_update para cada jogador individualmente
         def push_leaderboard_direct():
-            time.sleep(0.3)  # pequeno delay para garantir que o write commitou
+            # Sem sleep — o commit do SQLite já é síncrono; busca direta
             lb = db_get_leaderboard()
             if not lb:
-                time.sleep(1.0)  # retry uma vez se ainda vazio
+                time.sleep(0.5)  # retry curto apenas se o DB retornar vazio (raro)
                 lb = db_get_leaderboard()
             for sid in player_sids:
                 try:
@@ -419,6 +419,7 @@ class GameRoom:
             else:
                 self.scores[player_idx] = max(0, self.scores[player_idx] - 1)
             math_winner = player_idx if (correct and self.scores[player_idx] >= MAX_SCORE) else None
+            # Captura math_winner DENTRO do lock para evitar race condition
 
         sid = self.sids[player_idx]
         socketio.emit('math_result', {
@@ -475,7 +476,10 @@ class GameRoom:
                 'all_effects':       [e['label'] for e in self.WINNER_EFFECTS],
             }, room=self.room_id)
 
-            time.sleep(4.8)  # aguarda animação da roleta
+            time.sleep(4.8)  # aguarda animação da roleta no cliente
+            if not self.running:
+                self._finalizing = False
+                return
             self.math_active = False
             self._apply_effect(effect['id'], winner_idx)
         else:
@@ -688,7 +692,7 @@ class GameRoom:
             n    = random.randint(2, 6)
             a    = random.randint(1, 8)
             coef = a * n
-            return f"f(x) = {a}x^{n}  →  f'(coef x^{n-1}) = ?", coef
+            return f"f(x) = {a}x^{n}  →  f'(x) = ?", coef
 
         def q_geometria_area():
             b = random.randint(4, 20)
