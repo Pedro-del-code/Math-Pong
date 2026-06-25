@@ -3041,9 +3041,8 @@ function spinMapRoulette() {
         await _mapsReadyPromise;
       }
 
-      const ITEM_W    = 152;
-      const ITEM_GAP  = 6; // margin compensada
-      const STRIDE    = ITEM_W + ITEM_GAP;
+      const ITEM_W    = 152; // width(140) + margin-left(6) + margin-right(6) = stride real do CSS
+      const STRIDE    = ITEM_W; // ITEM_W já inclui as margens — não somar de novo
 
       // Sorteia o vencedor ANTES de montar a faixa — captura referência estável
       const winnerIdx = Math.floor(Math.random() * MAPS.length);
