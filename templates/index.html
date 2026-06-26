@@ -2991,6 +2991,8 @@ const _mapsReadyPromise = (async function loadServerMaps() {
         emoji: '🗺',
         url:   m.url,
       }));
+      // Pré-carrega todas as imagens no cache do browser para eliminar delay de rede
+      MAPS.forEach(m => { if (m.url) { const _img = new Image(); _img.src = m.url; } });
       console.log(`[MAPS] ${MAPS.length} mapas carregados do servidor.`);
     }
   } catch(e) {
@@ -3009,7 +3011,7 @@ function _getMapBg() {
       'position:fixed', 'inset:0', 'z-index:0', 'pointer-events:none',
       'background-size:cover', 'background-position:center',
       'background-repeat:no-repeat',
-      'transition:opacity 1.2s ease, background-image 0s',
+      'transition:opacity 0.5s ease, background-image 0s',
       'opacity:0',
     ].join(';');
     // Insere ANTES do canvas 3D para ficar atrás de tudo
@@ -3053,7 +3055,7 @@ function clearMapBg() {
     threeFloor.material.transparent = false;
     threeFloor.material.opacity = 1.0;
   }
-  setTimeout(() => { bg.style.backgroundImage = 'none'; }, 1200);
+  setTimeout(() => { bg.style.backgroundImage = 'none'; }, 600);
 }
 
 function spinMapRoulette() {
@@ -3088,8 +3090,9 @@ function spinMapRoulette() {
       items.forEach(m => {
         const div = document.createElement('div');
         div.className = 'map-roulette-item';
+        // Usa <img> para que os filtros CSS (.map-roulette-item img) funcionem corretamente
         const thumb = m.url
-          ? `<div style="height:88px;background:url('${m.url}') center/cover no-repeat;border-radius:4px 4px 0 0;"></div>`
+          ? `<img src="${m.url}" alt="${m.label}" style="width:100%;height:88px;object-fit:cover;display:block;border-radius:4px 4px 0 0;">`
           : `<div style="height:88px;display:flex;align-items:center;justify-content:center;font-size:40px;background:linear-gradient(135deg,rgba(0,238,255,0.05),rgba(0,0,0,0.8));">${m.emoji}</div>`;
         div.innerHTML = `${thumb}<div class="map-label">${m.label}</div>`;
         track.appendChild(div);
@@ -3111,23 +3114,26 @@ function spinMapRoulette() {
 
       // Posição final: centraliza no landingIdx
       const finalX = centerOffset - landingIdx * STRIDE;
-      track.style.transition = `transform 3.2s cubic-bezier(0.15, 0.0, 0.1, 1.0)`;
+      track.style.transition = `transform 2.5s cubic-bezier(0.15, 0.0, 0.1, 1.0)`;
       track.style.transform  = `translateX(${finalX}px)`;
 
-      // Highlight: usa posição calculada geometricamente (não lê transform do DOM)
+      // Highlight: ease-out cúbico (1-(1-t)^3) — aproxima bem o cubic-bezier(0.15,0,0.1,1)
       let _animStart = null;
-      const _animDuration = 3200;
+      const _animDuration = 2500;
       function _highlightFrame(ts) {
         if (!_animStart) _animStart = ts;
-        const elapsed  = Math.min(ts - _animStart, _animDuration);
-        // Ease cubic-bezier(0.15,0,0.1,1): aproximação
-        const t = elapsed / _animDuration;
-        const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-        const currentX = centerOffset + (finalX - centerOffset) * eased;
-        const scrolled = centerOffset - currentX;
-        const activeI  = Math.round(Math.max(0, scrolled) / STRIDE);
+        const elapsed = Math.min(ts - _animStart, _animDuration);
+        const done    = elapsed >= _animDuration;
+        // Quando terminou, força landingIdx diretamente — sem ambiguidade
+        const activeI = done ? landingIdx : (() => {
+          const t      = elapsed / _animDuration;
+          const eased  = 1 - Math.pow(1 - t, 3); // ease-out cúbico
+          const curX   = centerOffset + (finalX - centerOffset) * eased;
+          const scrolled = centerOffset - curX;
+          return Math.round(Math.max(0, scrolled) / STRIDE);
+        })();
         allItems.forEach((el, i) => el.classList.toggle('active', i === activeI));
-        if (elapsed < _animDuration) requestAnimationFrame(_highlightFrame);
+        if (!done) requestAnimationFrame(_highlightFrame);
       }
       requestAnimationFrame(_highlightFrame);
 
@@ -3140,7 +3146,7 @@ function spinMapRoulette() {
         chosen.textContent = winLabel; chosen.classList.add('show');
         SFX.rouletteResult?.();
 
-        // Aplica o mapa usando o objeto winner capturado — sem re-busca por id
+        // Aplica o mapa agora (imagem já pré-carregada) — fica pronto quando overlay fechar
         applyMapDirect(winner);
 
         setTimeout(() => {
@@ -3149,8 +3155,8 @@ function spinMapRoulette() {
           chosen.classList.remove('show');
           gamePaused = false;
           resolve(winner);
-        }, 1800);
-      }, 3300);
+        }, 1200);
+      }, 2600);
     })();
   });
 }
