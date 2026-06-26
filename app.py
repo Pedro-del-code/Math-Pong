@@ -104,16 +104,13 @@ waiting_lock = threading.Lock()
 class GameRoom:
 
     QUESTION_TIME = {
-        'soma': 5, 'sub': 5, 'mult': 6,
-        'mmc': 8,  'mdc': 8, 'fracao': 9,
-        'fracao_soma': 9, 'fracao_sub': 9,
-        'potencia': 6, 'raiz': 6,
-        'porcentagem': 8, 'regra3': 10,
-        'equacao': 12, 'equacao2': 15,
-        'pa': 14, 'area': 10,
-        'log_basico': 10, 'log': 12,
-        'trig': 10, 'det2x2': 12,
-        'derivada': 13,
+        'soma': 6, 'sub': 6, 'mult': 7,
+        'dobro': 5, 'metade': 5, 'triplo': 6,
+        'complemento': 6, 'divisao': 7,
+        'fracao_simples': 7, 'porcentagem': 8,
+        'potencia': 7, 'raiz': 7,
+        'pa_simples': 9, 'equacao': 10,
+        'trig': 9, 'log_basico': 9,
     }
 
     WINNER_EFFECTS = [
@@ -586,143 +583,145 @@ class GameRoom:
     def _gen_question(self):
         lv = self.level
 
+        # ── Questões fáceis de cabeça (todas as séries) ──────────────────────
+
         def q_soma():
-            a, b = random.randint(1, 60), random.randint(1, 60)
+            a, b = random.randint(3, 30), random.randint(3, 30)
             return f'{a} + {b} = ?', a + b
 
         def q_sub():
-            a = random.randint(10, 80)
-            b = random.randint(1, a)
-            return f'{a} - {b} = ?', a - b
+            a = random.randint(10, 50)
+            b = random.randint(2, a - 1)
+            return f'{a} − {b} = ?', a - b
 
         def q_mult():
-            a, b = random.randint(2, 12), random.randint(2, 12)
+            a = random.randint(2, 9)
+            b = random.randint(2, 9)
             return f'{a} × {b} = ?', a * b
 
-        def q_mmc():
-            pairs = [(4,6),(6,9),(4,10),(3,5),(6,8),(5,10),(4,12),(6,10),(8,12),(9,12)]
-            a, b = random.choice(pairs)
-            return f'MMC({a},{b}) = ?', (a * b) // math.gcd(a, b)
+        def q_dobro():
+            a = random.randint(5, 50)
+            return f'Dobro de {a} = ?', a * 2
 
-        def q_mdc():
-            pairs = [(12,8),(15,10),(18,12),(20,16),(24,18),(30,20),(36,24),(40,30)]
-            a, b = random.choice(pairs)
-            return f'MDC({a},{b}) = ?', math.gcd(a, b)
+        def q_metade():
+            a = random.choice([4, 6, 8, 10, 12, 14, 16, 18, 20,
+                               24, 30, 40, 50, 60, 80, 100, 120, 150, 200])
+            return f'Metade de {a} = ?', a // 2
 
-        def q_fracao():
-            den   = random.choice([2, 3, 4, 5, 6, 8, 10])
-            num_a = random.randint(1, den * 2)
-            num_b = random.randint(1, num_a)
-            return f'{num_a}/{den} - {num_b}/{den} = ?', num_a - num_b
+        def q_triplo():
+            a = random.randint(3, 20)
+            return f'Triplo de {a} = ?', a * 3
 
-        def q_fracao_soma():
-            den = random.choice([3, 4, 5, 6, 8, 10])
-            na  = random.randint(1, den)
-            nb  = random.randint(1, den)
-            return f'{na}/{den} + {nb}/{den} = ?', na + nb
+        def q_complemento():
+            a = random.randint(10, 90)
+            return f'{a} + __ = 100 →  __ = ?', 100 - a
 
-        def q_potencia():
-            base = random.randint(2, 9)
-            exp  = random.choice([2, 3])
-            sym  = '²' if exp == 2 else '³'
-            return f'{base}{sym} = ?', base ** exp
+        def q_divisao():
+            b = random.randint(2, 9)
+            ans = random.randint(2, 10)
+            return f'{b * ans} ÷ {b} = ?', ans
 
-        def q_raiz():
-            n = random.choice([4, 9, 16, 25, 36, 49, 64, 81, 100, 121, 144])
-            return f'√{n} = ?', int(n ** 0.5)
+        def q_fracao_simples():
+            den = random.choice([2, 4, 5, 10])
+            num = random.choice([1, 2, 3])
+            val = random.choice([20, 40, 60, 80, 100])
+            ans = (num * val) // den
+            return f'{num}/{den} de {val} = ?', ans
 
         def q_porcentagem():
             perc = random.choice([10, 20, 25, 50])
-            val  = random.choice([20, 40, 60, 80, 100, 120, 150, 200, 250, 300])
+            val  = random.choice([20, 40, 60, 80, 100, 120, 150, 200])
             return f'{perc}% de {val} = ?', (perc * val) // 100
 
-        def q_regra_tres():
-            a   = random.choice([2, 3, 4, 5, 6, 8, 10])
-            mul = random.randint(3, 8)
-            b   = a * mul
-            c   = random.choice([2, 3, 4, 5, 6])
-            return f'{a} → {b}\n{c} → ?', (b * c) // a
+        def q_potencia():
+            base = random.randint(2, 9)
+            exp  = 2
+            sym  = '²'
+            return f'{base}{sym} = ?', base ** exp
 
-        def q_equacao_1grau():
-            a = random.randint(2, 9)
-            x = random.randint(1, 15)
-            b = random.randint(0, 20)
-            c = a * x + b
-            return f'{a}x + {b} = {c}  →  x = ?', x
+        def q_raiz():
+            n = random.choice([4, 9, 16, 25, 36, 49, 64, 81, 100])
+            return f'√{n} = ?', int(n ** 0.5)
 
-        def q_equacao_produto_nulo():
-            r1  = random.randint(-6, 6)
-            r2  = random.randint(-6, 6)
-            ans = max(r1, r2)
-            B   = -(r1 + r2)
-            C   =  r1 * r2
-            bs  = f'+ {B}' if B >= 0 else f'- {abs(B)}'
-            cs  = f'+ {C}' if C >= 0 else f'- {abs(C)}'
-            return f'x² {bs}x {cs} = 0\nMaior raiz = ?', ans
-
-        def q_progressao_aritmetica():
+        def q_pa_simples():
             a1 = random.randint(1, 10)
-            r  = random.randint(2, 8)
-            n  = random.randint(4, 7)
-            an = a1 + (n - 1) * r
-            return f'PA: {a1}, {a1+r}, {a1+2*r}, ...\n{n}º termo = ?', an
+            r  = random.randint(2, 6)
+            # Mostra 3 termos, pede o 4º
+            return f'PA: {a1}, {a1+r}, {a1+2*r}, __ ?', a1 + 3*r
 
-        def q_log():
-            base = random.choice([2, 3, 5, 10])
-            exp  = random.randint(1, 4)
-            return f'log_{base}({base**exp}) = ?', exp
+        def q_equacao():
+            a = random.randint(2, 6)
+            x = random.randint(1, 10)
+            return f'{a}x = {a * x}  →  x = ?', x
+
+        def q_trig():
+            opts = [
+                ('sen(30°) = ?',  1),   # resposta 1 (= 1/2, mas inteiro → adaptado)
+                ('cos(60°) = ?',  1),   # idem
+                ('2·sen(30°) = ?', 1),
+                ('2·cos(60°) = ?', 1),
+                ('4·sen(30°) = ?', 2),
+                ('4·cos(60°) = ?', 2),
+                ('2·sen(90°) = ?', 2),
+                ('2·cos(0°) = ?',  2),
+            ]
+            return random.choice(opts)
 
         def q_log_basico():
             base = random.choice([2, 3, 10])
             exp  = random.randint(1, 3)
             return f'log_{base}({base**exp}) = ?', exp
 
-        def q_trigonometria():
-            opts = [
-                ('2 · sen(30°) = ?', 1),
-                ('2 · cos(60°) = ?', 1),
-                ('2 · sen(90°) = ?', 2),
-                ('2 · cos(0°) = ?',  2),
-                ('4 · sen(30°) = ?', 2),
-                ('4 · cos(60°) = ?', 2),
-            ]
-            return random.choice(opts)
+        # ── Pool por série ────────────────────────────────────────────────────
+        # Todas as questões são de cabeça — progressivo na complexidade
+        BASE = [
+            ('soma',   q_soma),
+            ('sub',    q_sub),
+            ('mult',   q_mult),
+            ('dobro',  q_dobro),
+            ('metade', q_metade),
+        ]
 
-        def q_derivada_simples():
-            n    = random.randint(2, 6)
-            a    = random.randint(1, 8)
-            coef = a * n
-            return f"f(x) = {a}x^{n}  →  f'(x) = ?", coef
+        EXTRA_6 = [
+            ('complemento', q_complemento),
+            ('triplo',      q_triplo),
+            ('divisao',     q_divisao),
+        ]
 
-        def q_geometria_area():
-            b = random.randint(4, 20)
-            h = random.randint(2, 16)
-            return f'Triâng.: base={b}, h={h}\nÁrea = ?', (b * h) // 2
+        EXTRA_7 = [
+            ('porcentagem',  q_porcentagem),
+            ('fracao_simples', q_fracao_simples),
+            ('potencia',     q_potencia),
+            ('raiz',         q_raiz),
+        ]
 
-        def q_det2x2():
-            a, b, c, d = [random.randint(-5, 8) for _ in range(4)]
-            return f'det|{a} {b} / {c} {d}| = ?', a * d - b * c
+        EXTRA_8 = [
+            ('potencia', q_potencia),
+            ('raiz',     q_raiz),
+            ('equacao',  q_equacao),
+        ]
 
-        # Pool por série
+        EXTRA_9 = [
+            ('pa_simples', q_pa_simples),
+            ('equacao',    q_equacao),
+            ('potencia',   q_potencia),
+        ]
+
+        EXTRA_HIGH = [
+            ('pa_simples',  q_pa_simples),
+            ('equacao',     q_equacao),
+            ('trig',        q_trig),
+            ('log_basico',  q_log_basico),
+        ]
+
         LEVELS = {
-            6:  [('soma', q_soma), ('sub', q_sub), ('mult', q_mult),
-                 ('mmc', q_mmc), ('mdc', q_mdc), ('fracao', q_fracao)],
-            7:  [('fracao_soma', q_fracao_soma), ('fracao_sub', q_fracao),
-                 ('equacao', q_equacao_1grau), ('porcentagem', q_porcentagem),
-                 ('potencia', q_potencia)],
-            8:  [('potencia', q_potencia), ('raiz', q_raiz),
-                 ('regra3', q_regra_tres), ('equacao', q_equacao_1grau),
-                 ('porcentagem', q_porcentagem)],
-            9:  [('equacao2', q_equacao_produto_nulo), ('pa', q_progressao_aritmetica),
-                 ('area', q_geometria_area), ('raiz', q_raiz), ('potencia', q_potencia)],
-            10: [('equacao2', q_equacao_produto_nulo), ('pa', q_progressao_aritmetica),
-                 ('log_basico', q_log_basico), ('trig', q_trigonometria),
-                 ('area', q_geometria_area)],
-            11: [('log', q_log), ('det2x2', q_det2x2), ('pa', q_progressao_aritmetica),
-                 ('equacao2', q_equacao_produto_nulo), ('raiz', q_raiz)],
-            12: [('derivada', q_derivada_simples), ('log', q_log),
-                 ('det2x2', q_det2x2), ('pa', q_progressao_aritmetica),
-                 ('trig', q_trigonometria)],
+            6:  BASE + EXTRA_6,
+            7:  BASE + EXTRA_6 + EXTRA_7,
+            8:  BASE + EXTRA_7 + EXTRA_8,
+            9:  BASE + EXTRA_7 + EXTRA_9,
+            10: BASE + EXTRA_7 + EXTRA_9 + EXTRA_HIGH,
+            11: BASE + EXTRA_7 + EXTRA_9 + EXTRA_HIGH,
+            12: BASE + EXTRA_8 + EXTRA_9 + EXTRA_HIGH,
         }
 
         pool         = LEVELS.get(lv, LEVELS[6])
@@ -732,20 +731,20 @@ class GameRoom:
             text, answer = gen_fn()
             answer = int(answer)
         except Exception:
-            a, b = random.randint(5, 40), random.randint(5, 40)
+            a, b = random.randint(5, 30), random.randint(5, 30)
             text, answer, qtype = f'{a} + {b} = ?', a + b, 'soma'
 
-        time_limit = self.QUESTION_TIME.get(qtype, 8)
+        time_limit = self.QUESTION_TIME.get(qtype, 7)
 
-        # Alternativas erradas plausíveis
-        spread   = max(3, abs(answer) // 4 + 2)
+        # Alternativas erradas plausíveis e próximas
+        spread   = max(2, abs(answer) // 5 + 2)
         wrongs   = set()
         attempts = 0
         while len(wrongs) < 3 and attempts < 300:
             attempts += 1
             delta = random.randint(1, spread)
             w     = answer + random.choice([-1, 1]) * delta
-            if w != answer:
+            if w != answer and w >= 0:
                 wrongs.add(w)
         fb = 1
         while len(wrongs) < 3:
